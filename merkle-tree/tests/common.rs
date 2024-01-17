@@ -18,3 +18,7 @@ pub const NODE_6: &str = "4c8a43980498636e9c1d1595fa5d115af7937c2422dfe68a2520a5
 pub const NODE_7: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"; // abc
 pub const NODE_8: &str = "0e99c08a90f789d5104b719807b5516cbb4b1d028855675ad4be4e79c89ffa7a"; // H(hijk + hijk)
 pub const NODE_9: &str = "a5e44df83b56c676fb3523fd3870267813b73c12e381540ad0846df6ba9819b5"; // H(NODE_8 + NODE_2)
+
+// 4c8a43980498636e9c1d1595fa5d115af7937c2422dfe68a2520a52b7a5fb4de
+// a5c2c204110ef9021125b05624cd732ca34c8e84afa21e91bba82bbd8c7833fb
+//

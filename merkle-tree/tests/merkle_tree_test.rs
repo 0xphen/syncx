@@ -2,6 +2,7 @@ mod common;
 
 use common::*;
 use merkle_tree::merkle_tree::MerkleTree;
+use std::collections::HashMap;
 
 #[cfg(test)]
 mod tests {
@@ -22,6 +23,13 @@ mod tests {
             vec![NODE_2, NODE_3],
             vec![NODE_1],
         ];
+        let mut expected_leaf_indexes: HashMap<String, (usize, usize)> = HashMap::new();
+        // expected_leaf_indexes.insert(NODE_7.to_string(), (0, 6));
+        // expected_leaf_indexes.insert(NODE_6.to_string(), (0, 6));
+        // expected_leaf_indexes.insert(NODE_1.to_string(), (0, 6));
+        // expected_leaf_indexes.insert(NODE_1.to_string(), (0, 6));
+        // expected_leaf_indexes.insert(NODE_1.to_string(), (0, 6));
+        // expected_leaf_indexes.insert(NODE_1.to_string(), (0, 6));
 
         assert!(merkle_tree.nodes == expected_merkle_tree_nodes);
     }
@@ -39,5 +47,12 @@ mod tests {
         ];
 
         assert!(merkle_tree.nodes == expected_merkle_tree_nodes);
+    }
+
+    #[test]
+    fn should_generate_a_valid_proof_for_an_odd_tree() {
+        let merkle_tree = MerkleTree::new(&BYTE_ARRAY_MATRIX);
+        let proof = merkle_tree.generate_merkle_proof(NODE_7).unwrap();
+        assert!(proof == vec![NODE_6, NODE_3]);
     }
 }

@@ -48,4 +48,43 @@ impl MerkleTree {
     pub fn build_leaf_hashes(bytes: &Vec<Vec<u8>>) -> Vec<String> {
         bytes.par_iter().map(|block| hash_bytes(block)).collect()
     }
+
+    pub fn generate_merkle_proof(&self, leaf: &str) -> Result<Vec<String>, SynxError> {
+        if let Some((_level, leaf_index)) = self.leaf_indexes.get(leaf) {
+            self.proof(*leaf_index)
+        } else {
+            Err(SynxError::InvalidNode)
+        }
+    }
+
+    fn proof(&self, leaf_index: usize) -> Result<Vec<String>, SynxError> {
+        if leaf_index >= self.nodes[0].len() {
+            return Err(SynxError::OutOfBounds); // Leaf index is out of bounds
+        }
+
+        let mut proof = Vec::new();
+        let mut index = leaf_index;
+
+        // Iterate through each level of the Merkle tree
+        for level in self.nodes.iter().rev().skip(1).rev() {
+            if level.len() <= index {
+                return Err(SynxError::OutOfBounds);
+            }
+
+            // Find the sibling index (left or right)
+            let sibling_index = if index % 2 == 0 {
+                index + 1.min(level.len() - 1)
+            } else {
+                index - 1
+            };
+
+            // Add the sibling's hash to the proof
+            proof.push(level[sibling_index].clone());
+
+            // Move up to the parent level
+            index /= 2;
+        }
+
+        Ok(proof)
+    }
 }
