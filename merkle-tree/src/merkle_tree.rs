@@ -40,6 +40,36 @@ impl MerkleTree {
         }
     }
 
+    pub fn generate_merkle_proof(&self, leaf: &str) -> Result<Vec<String>, SynxError> {
+        if let Some(leaf_index) = self.leaf_indexes.get(leaf) {
+            self.proof(*leaf_index)
+        } else {
+            Err(SynxError::InvalidNode)
+        }
+    }
+
+    fn proof(&self, leaf_index: usize) -> Result<Vec<String>, SynxError> {
+        if leaf_index >= self.nodes.len() {
+            return Err(SynxError::OutOfBounds);
+        }
+
+        let mut proof = Vec::new();
+        let mut current_index = leaf_index;
+
+        while current_index > 0 {
+            let sibling_index = if current_index % 2 == 0 {
+                current_index - 1 // Left sibling
+            } else {
+                current_index + 1
+            };
+
+            proof.push(self.nodes[sibling_index].clone());
+            current_index = (current_index - 1) / 2;
+        }
+
+        Ok(proof)
+    }
+
     pub fn build_leaf_hashes(bytes: &Vec<Vec<u8>>) -> Vec<String> {
         bytes.par_iter().map(|block| hash_bytes(block)).collect()
     }
