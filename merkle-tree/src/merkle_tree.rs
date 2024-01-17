@@ -10,7 +10,7 @@ pub struct MerkleTree {
 
 impl MerkleTree {
     pub fn new(leaf_bytes: &Vec<Vec<u8>>) -> Self {
-        let leaves = Self::build_leaf_hashes(leaf_bytes);
+        let leaves = Self::build_leaf_nodes(leaf_bytes);
         let mut leaf_indexes: HashMap<_, _> = HashMap::new();
 
         leaves.iter().enumerate().for_each(|(index, leaf)| {
@@ -42,11 +42,19 @@ impl MerkleTree {
             new_leaves.push(leaf);
         });
 
+        println!("new_leaves{:?}  ", new_leaves);
+
         Self::from_leaves(new_leaves, nodes)
     }
 
-    pub fn build_leaf_hashes(bytes: &Vec<Vec<u8>>) -> Vec<String> {
-        bytes.par_iter().map(|block| hash_bytes(block)).collect()
+    pub fn build_leaf_nodes(bytes: &Vec<Vec<u8>>) -> Vec<String> {
+        let mut leaves = bytes
+            .par_iter()
+            .map(|block| hash_bytes(block))
+            .collect::<Vec<String>>();
+
+        leaves.sort();
+        leaves
     }
 
     pub fn generate_merkle_proof(&self, leaf: &str) -> Result<Vec<String>, SynxError> {

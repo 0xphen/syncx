@@ -10,8 +10,8 @@ mod tests {
 
     #[test]
     fn should_build_leaf_nodes() {
-        let leaf_nodes = MerkleTree::build_leaf_hashes(&BYTE_ARRAY_MATRIX);
-        assert!(vec![NODE_7, NODE_6, NODE_5, NODE_4] == leaf_nodes);
+        let leaf_nodes = MerkleTree::build_leaf_nodes(&BYTE_ARRAY_MATRIX);
+        assert!(vec![LA, LB, LC, LD] == leaf_nodes);
     }
 
     #[test]
@@ -19,18 +19,11 @@ mod tests {
         let merkle_tree = MerkleTree::new(&BYTE_ARRAY_MATRIX);
 
         let expected_merkle_tree_nodes = vec![
-            vec![NODE_7, NODE_6, NODE_5, NODE_4],
-            vec![NODE_2, NODE_3],
-            vec![NODE_1],
+            vec![LA, LB, LC, LD],
+            vec![H_LA_LB, H_LC_LD],
+            vec![H_LALB_LCLD],
         ];
-        let mut expected_leaf_indexes: HashMap<String, (usize, usize)> = HashMap::new();
-        // expected_leaf_indexes.insert(NODE_7.to_string(), (0, 6));
-        // expected_leaf_indexes.insert(NODE_6.to_string(), (0, 6));
-        // expected_leaf_indexes.insert(NODE_1.to_string(), (0, 6));
-        // expected_leaf_indexes.insert(NODE_1.to_string(), (0, 6));
-        // expected_leaf_indexes.insert(NODE_1.to_string(), (0, 6));
-        // expected_leaf_indexes.insert(NODE_1.to_string(), (0, 6));
-
+        // let mut expected_leaf_indexes: HashMap<String, (usize, usize)> = HashMap::new();
         assert!(merkle_tree.nodes == expected_merkle_tree_nodes);
     }
 
@@ -40,19 +33,16 @@ mod tests {
         leaves.pop();
         let merkle_tree = MerkleTree::new(&leaves);
 
-        let expected_merkle_tree_nodes = vec![
-            vec![NODE_7, NODE_6, NODE_5],
-            vec![NODE_2, NODE_8],
-            vec![NODE_9],
-        ];
+        let expected_merkle_tree_nodes =
+            vec![vec![LA, LB, LD], vec![H_LA_LB, H_LD_LD], vec![H_LALB_LDLD]];
 
         assert!(merkle_tree.nodes == expected_merkle_tree_nodes);
     }
 
     #[test]
-    fn should_generate_a_valid_proof_for_an_odd_tree() {
+    fn should_generate_a_valid_proof_for_an_even_tree() {
         let merkle_tree = MerkleTree::new(&BYTE_ARRAY_MATRIX);
-        let proof = merkle_tree.generate_merkle_proof(NODE_7).unwrap();
-        assert!(proof == vec![NODE_6, NODE_3]);
+        let proof = merkle_tree.generate_merkle_proof(LD).unwrap();
+        assert!(proof == vec![LC, H_LA_LB]);
     }
 }
