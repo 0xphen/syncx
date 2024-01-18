@@ -18,7 +18,7 @@ impl MerkleTree {
         });
 
         let mut nodes = Vec::new();
-        Self::from_leaves(leaves, &mut nodes);
+        Self::from_leaves(leaves, &mut nodes, &mut leaf_indexes, 1);
 
         Self {
             nodes,
@@ -26,7 +26,12 @@ impl MerkleTree {
         }
     }
 
-    fn from_leaves(leaves: Vec<String>, nodes: &mut Vec<Vec<String>>) {
+    fn from_leaves(
+        leaves: Vec<String>,
+        nodes: &mut Vec<Vec<String>>,
+        leaf_indexes: &mut HashMap<String, (usize, usize)>,
+        level: usize,
+    ) {
         let size_of_leaves = leaves.len();
         nodes.push(leaves.clone());
 
@@ -35,16 +40,19 @@ impl MerkleTree {
         }
 
         let mut new_leaves = Vec::new();
+        let mut pos = 0;
         leaves.chunks(2).for_each(|chunk| {
             let left = chunk[0].clone();
             let right = chunk.get(1).unwrap_or(&left).clone();
             let leaf = hash_bytes(format!("{}{}", left, right).as_bytes());
+
+            leaf_indexes.insert(leaf.clone(), (level, pos));
             new_leaves.push(leaf);
+            pos += 1;
         });
 
-        println!("new_leaves{:?}  ", new_leaves);
-
-        Self::from_leaves(new_leaves, nodes)
+        let level = level + 1;
+        Self::from_leaves(new_leaves, nodes, leaf_indexes, level)
     }
 
     pub fn build_leaf_nodes(bytes: &Vec<Vec<u8>>) -> Vec<String> {
@@ -81,7 +89,7 @@ impl MerkleTree {
 
             // Find the sibling index (left or right)
             let sibling_index = if index % 2 == 0 {
-                index + 1.min(level.len() - 1)
+                (index + 1).min(level.len() - 1)
             } else {
                 index - 1
             };
@@ -95,4 +103,64 @@ impl MerkleTree {
 
         Ok(proof)
     }
+
+    pub fn verify(&self, leaf: &str, merkle_proof: Vec<String>, root_leaf: &str) -> bool {
+        let mut current_leaf = leaf.to_string();
+
+        for hash in merkle_proof {
+            let (a, b) = self.cmp_leaves(&current_leaf, hash.as_str());
+            current_leaf = hash_bytes(format!("{}{}", a, b).as_bytes());
+        }
+
+        current_leaf == root_leaf
+    }
+
+    fn cmp_leaves<'a>(&self, a: &'a str, b: &'a str) -> (&'a str, &'a str) {
+        let mut indexes = vec![
+            ((self.leaf_indexes.get(a).unwrap()).1, a),
+            ((self.leaf_indexes.get(b).unwrap()).1, b),
+        ];
+
+        indexes.sort_by(|&b, &a| b.0.cmp(&a.0));
+        (indexes[0].1, indexes[1].1)
+    }
 }
+
+// pub fn verify(
+//   &self,
+//   leaf: &str,
+//   merkle_proof: Vec<String>,
+//   root_leaf: &str,
+// ) -> Result<bool, SynxError> {
+//   // Check if the leaf exists in the tree
+//   let current_leaf = match self.leaf_indexes.get(leaf) {
+//       Some(outter_index) => (outter_index.1, leaf),
+//       None => return Err(SynxError::InvalidNode),
+//   };
+
+//   // Iterate through the proof hashes
+//   for hash in merkle_proof {
+//       // Check if the proof hash exists in the tree
+//       let inner_index = match self.leaf_indexes.get(hash.as_ref()) {
+//           Some(index) => (index.1, hash.as_ref()),
+//           None => return Err(SynxError::InvalidNode),
+//       };
+
+//       // Determine the order of the indexes
+//       let (first_leaf, second_leaf) = if current_leaf.0 < inner_index.0 {
+//           (current_leaf.1, inner_index.1)
+//       } else {
+//           (inner_index.1, current_leaf.1)
+//       };
+
+//       // Concatenate and hash the two ordered values
+//       let concatenated_hash = format!("{}{}", first_leaf, second_leaf);
+//       let hash_result = hash_bytes(concatenated_hash.as_bytes());
+
+//       // Update current_leaf for the next iteration
+//       current_leaf = (first_index.0, hash_result.as_str());
+//   }
+
+//   // Check if the final result matches the root_leaf
+//   Ok(current_leaf.1 == root_leaf)
+// }
