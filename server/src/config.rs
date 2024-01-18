@@ -23,7 +23,7 @@ impl Config {
             SynxServerError::InvalidServerSettings("REDIS_URL not present".to_string())
         })?;
 
-        let db_name = std::env::var("REDIS_URL").map_err(|_err| {
+        let db_name = std::env::var("DB_NAME").map_err(|_err| {
             SynxServerError::InvalidServerSettings("DB_NAME not present".to_string())
         })?;
 
@@ -34,6 +34,7 @@ impl Config {
         let mut jwt_exp = std::env::var("JWT_EXP").map_err(|_err| {
             SynxServerError::InvalidServerSettings("JWT_EXP not present".to_string())
         })?;
+
         let jwt_exp = jwt_exp
             .parse::<i64>()
             .map_err(|_err| SynxServerError::ParseIntError)?;

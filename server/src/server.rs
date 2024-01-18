@@ -1,16 +1,10 @@
 extern crate proto;
 
-use proto::syncx::{
-    syncx_server::{Syncx, SyncxServer},
-    CreateClientRequest, CreateClientResponse,
-};
+use proto::syncx::{syncx_server::Syncx, CreateClientRequest, CreateClientResponse};
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
-use crate::{
-    auth, config::Config, definitions::ClientObject, definitions::Store, errors::SynxServerError,
-    store_v1::StoreV1,
-};
+use crate::{auth, config::Config, definitions::ClientObject, definitions::Store};
 
 pub struct Server<T> {
     pub store: T,
@@ -18,12 +12,11 @@ pub struct Server<T> {
 }
 
 impl<T> Server<T> {
-    pub async fn new(store: T) -> Result<Self, SynxServerError>
+    pub async fn new(store: T, config: Config) -> Self
     where
         T: Store + Send + Sync + 'static,
     {
-        let config = Config::load_config()?;
-        Ok(Self { store, config })
+        Self { store, config }
     }
 }
 
@@ -37,6 +30,7 @@ where
         request: Request<CreateClientRequest>,
     ) -> Result<Response<CreateClientResponse>, Status> {
         let id = (Uuid::new_v4()).to_string();
+
         let jwt_token = auth::jwt::create_jwt(&id, &self.config.jwt_secret, self.config.jwt_exp)
             .map_err(|_| Status::internal("Failed to create auth token"))?;
 
@@ -48,6 +42,7 @@ where
             id: id.clone(),
             password: hashed_password,
         };
+
         self.store
             .save_client_object(client_object)
             .await

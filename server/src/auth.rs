@@ -13,7 +13,7 @@ pub mod jwt {
     }
 
     pub fn create_jwt(uid: &str, secret: &str, t: i64) -> Result<String, SynxServerError> {
-        let mut header = Header::new(Algorithm::RS256);
+        let mut header = Header::new(Algorithm::HS512);
         header.typ = Some("JWT".to_string());
 
         let exp = Utc::now()

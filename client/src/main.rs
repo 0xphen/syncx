@@ -1,6 +1,18 @@
 mod errors;
 mod service;
 
-fn main() {
-    println!("Hello, world!");
+use proto::syncx::syncx_client::SyncxClient;
+use proto::syncx::CreateClientRequest;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut client = SyncxClient::connect("http://[::1]:10000").await?;
+    let res = client
+        .register_client(CreateClientRequest {
+            password: "Kifen".to_string(),
+        })
+        .await?;
+
+    println!("res: {:?}", res);
+    Ok(())
 }
