@@ -1,0 +1,15 @@
+// client.proto
+syntax = "proto3";
+package syncx;
+
+service Syncx {
+  rpc RegisterClient(CreateClientRequest) returns (CreateClientResponse) {}
+}
+
+message CreateClientRequest {
+    string password = 1;
+}
+
+message CreateClientResponse {
+    string id = 1;
+}
