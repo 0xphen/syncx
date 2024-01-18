@@ -12,4 +12,5 @@ message CreateClientRequest {
 
 message CreateClientResponse {
     string id = 1;
+    string jwt_token = 2;
 }

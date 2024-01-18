@@ -15,9 +15,6 @@ pub mod client {
             .await
             .map_err(|err| SynxClientError::FailedToRegisterClient(err.to_string()))?;
 
-          Ok(response.into_inner().id)
-
-
+        Ok(response.into_inner().id)
     }
 }
-

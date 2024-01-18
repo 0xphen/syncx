@@ -1,7 +1,5 @@
-use thiserror::Error;
-
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum SynxClientError {
-    #[error("Failed to decode hex `0`")]
+    #[error("Failed to register client: {0}")]
     FailedToRegisterClient(String),
 }

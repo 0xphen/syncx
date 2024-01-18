@@ -3,5 +3,6 @@ resolver = "2"
 members = [
   "merkle-tree",
   "client",
+  "server",
   "proto"
 ]
