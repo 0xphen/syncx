@@ -26,4 +26,10 @@ pub enum SynxServerError {
 
     #[error("Failed to create client in MongoDB")]
     MongoDbClientCreationError,
+
+    #[error("Invalid JWT timestamp when creating claims")]
+    ClaimsTimestampError,
+
+    #[error("invalid jwt token")]
+    InvalidJWTTokenError,
 }
