@@ -1,7 +1,7 @@
 pub mod client {
     extern crate proto;
 
-    use crate::context::Context;
+    use crate::core::context::Context;
     use proto::syncx::{syncx_client::SyncxClient, CreateClientRequest, CreateClientResponse};
 
     pub async fn register_client(

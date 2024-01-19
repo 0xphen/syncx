@@ -1,9 +1,7 @@
 mod cli;
-mod context;
-mod errors;
-mod service;
+mod core;
 
-use context::*;
+use core::context::*;
 use proto::syncx::syncx_client::SyncxClient;
 use proto::syncx::CreateClientRequest;
 

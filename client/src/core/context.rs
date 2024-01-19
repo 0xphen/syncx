@@ -5,7 +5,7 @@ use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
-use crate::errors::SynxClientError;
+use super::errors::SynxClientError;
 
 pub struct Context {
     pub app_config: AppConfig,
