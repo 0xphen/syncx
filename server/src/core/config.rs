@@ -5,10 +5,10 @@ use super::errors::SynxServerError;
 #[derive(Debug)]
 pub struct Config {
     pub database_url: String,
-    pub db_name: String,
     pub redis_url: String,
     pub jwt_secret: String,
     pub jwt_exp: i64,
+    pub db_name: String,
 }
 
 impl Config {
@@ -23,10 +23,6 @@ impl Config {
             SynxServerError::InvalidServerSettings("REDIS_URL not present".to_string())
         })?;
 
-        let db_name = std::env::var("DB_NAME").map_err(|_err| {
-            SynxServerError::InvalidServerSettings("DB_NAME not present".to_string())
-        })?;
-
         let jwt_secret = std::env::var("JWT_SECRET").map_err(|_err| {
             SynxServerError::InvalidServerSettings("JWT_SECRET not present".to_string())
         })?;
@@ -39,12 +35,16 @@ impl Config {
             .parse::<i64>()
             .map_err(|_err| SynxServerError::ParseIntError)?;
 
+        let db_name = std::env::var("DB_NAME").map_err(|_err| {
+            SynxServerError::InvalidServerSettings("DB_NAME not present".to_string())
+        })?;
+
         Ok(Config {
             database_url,
             redis_url,
-            db_name,
             jwt_secret,
             jwt_exp,
+            db_name,
         })
     }
 }

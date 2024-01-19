@@ -12,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Config::load_config().unwrap_or_else(|e| panic!("Failed to load configuration: {}", e));
 
     // Initialize StoreV1, panic on failure
-    let store_v1 = StoreV1::new(&config.database_url, &config.db_name)
+    let store_v1 = StoreV1::new(&config.database_url, &config.redis_url, &config.db_name)
         .await
         .unwrap_or_else(|e| panic!("Failed to initialize StoreV1: {}", e));
 
