@@ -7,11 +7,23 @@ use std::path::{Path, PathBuf};
 
 use crate::errors::SynxClientError;
 
+pub struct Context {
+    pub app_config: AppConfig,
+    pub path: PathBuf,
+}
+
+impl Context {
+    pub fn new(app_config: AppConfig, path: PathBuf) -> Self {
+        Self { app_config, path }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-struct AppConfig {
-    pub merkle_tree_root: String,
+pub struct AppConfig {
     id: String,
+    password: String,
     jwt: String,
+    merkle_tree_root: String,
 }
 
 impl Default for AppConfig {
@@ -20,12 +32,13 @@ impl Default for AppConfig {
             merkle_tree_root: String::new(),
             id: String::new(),
             jwt: String::new(),
+            password: String::new(),
         }
     }
 }
 
 impl AppConfig {
-    fn get_config_path() -> Result<PathBuf, SynxClientError> {
+    pub fn get_config_path() -> Result<PathBuf, SynxClientError> {
         if let Some(proj_dirs) = ProjectDirs::from("com", "Synx", "Client") {
             let config_dir = proj_dirs.config_dir();
 
@@ -38,11 +51,10 @@ impl AppConfig {
         }
     }
 
-    fn write_config(&self, path: &PathBuf) -> Result<(), SynxClientError> {
+    pub fn write(&self, path: &PathBuf) -> Result<(), SynxClientError> {
         let file = OpenOptions::new()
             .write(true)
             .create(true)
-            // .truncate(true)
             .open(path)
             .map_err(|_| SynxClientError::ConfigFileWriteError)?;
 
@@ -51,10 +63,26 @@ impl AppConfig {
         Ok(())
     }
 
-    fn read_config(path: &PathBuf) -> std::io::Result<AppConfig> {
+    pub fn read(path: &PathBuf) -> std::io::Result<AppConfig> {
         let file = File::open(path)?;
         let config = serde_json::from_reader(file)?;
         Ok(config)
+    }
+
+    pub fn set_merkle_root(&mut self, root: String) {
+        self.merkle_tree_root = root;
+    }
+
+    pub fn set_jwt(&mut self, jwt: String) {
+        self.jwt = jwt;
+    }
+
+    pub fn set_id(&mut self, id: String) {
+        self.id = id;
+    }
+
+    pub fn set_password(&mut self, password: String) {
+        self.password = password;
     }
 }
 
@@ -68,18 +96,19 @@ mod tests {
 
         // Write when config is empty
         let mut app_config = AppConfig::default();
-        app_config.write_config(&path);
+        app_config.write(&path);
 
-        let mut config = AppConfig::read_config(&path).unwrap();
+        let mut config = AppConfig::read(&path).unwrap();
         assert!(config == AppConfig::default());
 
         // Write when config is not empty
         app_config.merkle_tree_root = "merkle_tree_root".to_string();
         app_config.id = "abcd".to_string();
         app_config.jwt = "jwt".to_string();
+        app_config.password = "password".to_string();
 
-        app_config.write_config(&path);
-        config = AppConfig::read_config(&path).unwrap();
+        app_config.write(&path);
+        config = AppConfig::read(&path).unwrap();
 
         assert!(config == app_config);
     }

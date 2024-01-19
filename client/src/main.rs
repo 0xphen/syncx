@@ -1,21 +1,23 @@
-mod app_config;
+mod cli;
+mod context;
 mod errors;
 mod service;
 
+use context::*;
 use proto::syncx::syncx_client::SyncxClient;
 use proto::syncx::CreateClientRequest;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = SyncxClient::connect("http://[::1]:10000").await?;
-    let res = client
-        .register_client(CreateClientRequest {
-            password: "Kifen".to_string(),
-        })
-        .await?;
+    let app_config_path = AppConfig::get_config_path()
+        .unwrap_or_else(|e| panic!("Failed to get client config path {}", e));
 
-    println!("res: {:?}", res);
+    let app_config = AppConfig::read(&app_config_path)
+        .unwrap_or_else(|e| panic!("Failed to load app config: {}", e));
+
+    let mut context = Context::new(app_config, app_config_path);
+    let mut syncx_client = SyncxClient::connect("http://[::1]:10000").await?;
+
+    cli::run(&mut syncx_client, &mut context).await;
     Ok(())
 }
-
-// { metadata: MetadataMap { headers: {"content-type": "application/grpc", "date": "Thu, 18 Jan 2024 22:47:51 GMT", "grpc-status": "0"} }, message: CreateClientResponse { id: "de93057b-277d-421a-a872-66cccad7788e", jwt_token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJkZTkzMDU3Yi0yNzdkLTQyMWEtYTg3Mi02NmNjY2FkNzc4OGUiLCJleHAiOjE3MDU2MTgxMjYsImlzcyI6IlN5bmN4U2VydmVyIn0.CAhUyRSS454ltAxVRCLvX7ETdKedW7c7pYfUNdGDsSH5xVqRmdPoHiSgMSW22pnFeojQTSXjdmRuc31CPHP0Ag" }, extensions: Extensions }
