@@ -4,7 +4,7 @@ use proto::syncx::{syncx_server::Syncx, CreateClientRequest, CreateClientRespons
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
-use crate::{auth, config::Config, definitions::ClientObject, definitions::Store};
+use super::{auth, config::Config, definitions::ClientObject, definitions::Store};
 
 pub struct Server<T> {
     pub store: T,

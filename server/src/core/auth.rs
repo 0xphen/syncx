@@ -3,7 +3,7 @@ pub mod jwt {
     use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
     use serde::{Deserialize, Serialize};
 
-    use crate::errors::SynxServerError;
+    use crate::core::errors::SynxServerError;
 
     #[derive(Debug, Serialize, Deserialize)]
     struct Claims {
@@ -44,7 +44,7 @@ pub mod hash_utils {
         Argon2,
     };
 
-    use crate::errors::SynxServerError;
+    use crate::core::errors::SynxServerError;
 
     pub fn hash_password(password: &str) -> Result<String, SynxServerError> {
         let salt = SaltString::generate(&mut OsRng);

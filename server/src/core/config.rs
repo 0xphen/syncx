@@ -1,6 +1,6 @@
 use dotenv::dotenv;
 
-use crate::errors::SynxServerError;
+use super::errors::SynxServerError;
 
 #[derive(Debug)]
 pub struct Config {

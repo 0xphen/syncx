@@ -1,16 +1,9 @@
-mod auth;
-mod config;
-mod definitions;
-mod errors;
-mod server;
-mod store_v1;
+mod core;
 
 use tonic::transport::Server;
 
-use config::Config;
+use core::{config::Config, server::Server as InnerServer, store_v1::StoreV1};
 use proto::syncx::syncx_server::SyncxServer;
-use server::Server as InnerServer;
-use store_v1::StoreV1;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
