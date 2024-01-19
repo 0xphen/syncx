@@ -1,8 +1,11 @@
 use super::errors::SynxServerError;
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+pub type Result<T> = std::result::Result<T, SynxServerError>;
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct ClientObject {
     pub id: String,
     pub password: String,
@@ -10,10 +13,7 @@ pub struct ClientObject {
 
 #[async_trait]
 pub trait Store {
-    async fn get_client_object(&self, id: &str) -> Result<Option<ClientObject>, SynxServerError>;
+    async fn get_client_object(&self, id: &str) -> Result<Option<ClientObject>>;
 
-    async fn save_client_object(
-        &self,
-        client_object: ClientObject,
-    ) -> Result<bool, SynxServerError>;
+    async fn save_client_object(&self, client_object: ClientObject) -> Result<bool>;
 }
