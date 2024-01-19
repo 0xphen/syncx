@@ -13,7 +13,7 @@ pub mod client {
                 password: password.to_string(),
             })
             .await
-            .map_err(|err| SynxClientError::FailedToRegisterClient(err.to_string()))?;
+            .map_err(|err| SynxClientError::ClientRegistrationError(err.to_string()))?;
 
         Ok(response.into_inner().id)
     }

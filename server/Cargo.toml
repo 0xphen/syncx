@@ -12,10 +12,11 @@ tonic = "0.10.2"
 thiserror = "1.0.56"
 mongodb = "2.8.0"
 dotenv = "0.15.0"
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0.195", features = ["derive"] }
 async-trait = "0.1.77"
 jsonwebtoken = "9.2.0"
 utc = "0.2.0"
 chrono = "0.4.31"
 uuid = { version = "1.6.1", features = ["v4", "fast-rng"] }
 argon2 = "0.5.2"
+directories = "5.0.1"
