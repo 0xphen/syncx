@@ -7,9 +7,9 @@ pub mod jwt {
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct Claims {
-        sub: String,
-        exp: usize,
-        iss: String,
+        pub sub: String,
+        pub exp: usize,
+        pub iss: String,
     }
     /// Creates a JSON Web Token (JWT) for a given user identifier using the HS512 signing algorithm.
     ///

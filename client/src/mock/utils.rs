@@ -45,7 +45,7 @@ use super::errors::SynxClientError;
 /// Each file in the ZIP archive is compressed using the DEFLATE compression
 ///  algorithm, which provides a good balance between compression ratio and
 ///  speed, making it suitable for a wide range of file types.
-pub fn zip_files<P: AsRef<Path>>(file_paths: &[P], output_path: &P) -> io::Result<()> {
+fn zip_files<P: AsRef<Path>>(file_paths: &[P], output_path: P) -> io::Result<()> {
     let file = File::create(output_path)?;
     let mut zip = ZipWriter::new(file);
 
@@ -98,7 +98,7 @@ pub fn zip_files<P: AsRef<Path>>(file_paths: &[P], output_path: &P) -> io::Resul
 /// - The function automatically handles both files and directories within the ZIP archive.
 /// - It ensures that all necessary parent directories are created.
 /// - Files are written to disk using buffered I/O for efficiency.
-pub fn unzip_file<P: AsRef<Path>>(zip_path: P, extract_to: P) -> io::Result<()> {
+fn unzip_file<P: AsRef<Path>>(zip_path: P, extract_to: P) -> io::Result<()> {
     let file = File::open(zip_path)?;
     let mut archive = ZipArchive::new(BufReader::new(file))?;
 

@@ -5,31 +5,28 @@ use std::collections::HashMap;
 #[derive(Debug, PartialEq)]
 pub struct MerkleTree {
     pub nodes: Vec<Vec<String>>,
-    leaf_indexes: HashMap<String, (usize, usize)>,
+    indexes: HashMap<String, (usize, usize)>,
 }
 
 impl MerkleTree {
     pub fn new(leaf_bytes: &Vec<Vec<u8>>) -> Self {
         let leaves = Self::build_leaf_nodes(leaf_bytes);
-        let mut leaf_indexes: HashMap<_, _> = HashMap::new();
+        let mut indexes: HashMap<_, _> = HashMap::new();
 
         leaves.iter().enumerate().for_each(|(index, leaf)| {
-            leaf_indexes.insert(leaf.clone(), (0, index));
+            indexes.insert(leaf.clone(), (0, index));
         });
 
         let mut nodes = Vec::new();
-        Self::from_leaves(leaves, &mut nodes, &mut leaf_indexes, 1);
+        Self::from_leaves(leaves, &mut nodes, &mut indexes, 1);
 
-        Self {
-            nodes,
-            leaf_indexes,
-        }
+        Self { nodes, indexes }
     }
 
     fn from_leaves(
         leaves: Vec<String>,
         nodes: &mut Vec<Vec<String>>,
-        leaf_indexes: &mut HashMap<String, (usize, usize)>,
+        indexes: &mut HashMap<String, (usize, usize)>,
         level: usize,
     ) {
         let size_of_leaves = leaves.len();
@@ -46,13 +43,13 @@ impl MerkleTree {
             let right = chunk.get(1).unwrap_or(&left).clone();
             let leaf = hash_bytes(format!("{}{}", left, right).as_bytes());
 
-            leaf_indexes.insert(leaf.clone(), (level, pos));
+            indexes.insert(leaf.clone(), (level, pos));
             new_leaves.push(leaf);
             pos += 1;
         });
 
         let level = level + 1;
-        Self::from_leaves(new_leaves, nodes, leaf_indexes, level)
+        Self::from_leaves(new_leaves, nodes, indexes, level)
     }
 
     pub fn build_leaf_nodes(bytes: &Vec<Vec<u8>>) -> Vec<String> {
@@ -66,7 +63,7 @@ impl MerkleTree {
     }
 
     pub fn generate_merkle_proof(&self, leaf: &str) -> Result<Vec<String>, SynxError> {
-        if let Some((_level, leaf_index)) = self.leaf_indexes.get(leaf) {
+        if let Some((_level, leaf_index)) = self.indexes.get(leaf) {
             self.proof(*leaf_index)
         } else {
             Err(SynxError::InvalidNode)
@@ -117,8 +114,8 @@ impl MerkleTree {
 
     fn cmp_leaves<'a>(&self, a: &'a str, b: &'a str) -> (&'a str, &'a str) {
         let mut indexes = vec![
-            ((self.leaf_indexes.get(a).unwrap()).1, a),
-            ((self.leaf_indexes.get(b).unwrap()).1, b),
+            ((self.indexes.get(a).unwrap()).1, a),
+            ((self.indexes.get(b).unwrap()).1, b),
         ];
 
         indexes.sort_by(|&b, &a| b.0.cmp(&a.0));
@@ -128,43 +125,8 @@ impl MerkleTree {
     pub fn leaf_nodes(&self) -> &Vec<String> {
         &self.nodes[0]
     }
+
+    pub fn root(&self) -> &str {
+        &self.nodes[self.nodes.len() - 1][0]
+    }
 }
-
-// pub fn verify(
-//   &self,
-//   leaf: &str,
-//   merkle_proof: Vec<String>,
-//   root_leaf: &str,
-// ) -> Result<bool, SynxError> {
-//   // Check if the leaf exists in the tree
-//   let current_leaf = match self.leaf_indexes.get(leaf) {
-//       Some(outter_index) => (outter_index.1, leaf),
-//       None => return Err(SynxError::InvalidNode),
-//   };
-
-//   // Iterate through the proof hashes
-//   for hash in merkle_proof {
-//       // Check if the proof hash exists in the tree
-//       let inner_index = match self.leaf_indexes.get(hash.as_ref()) {
-//           Some(index) => (index.1, hash.as_ref()),
-//           None => return Err(SynxError::InvalidNode),
-//       };
-
-//       // Determine the order of the indexes
-//       let (first_leaf, second_leaf) = if current_leaf.0 < inner_index.0 {
-//           (current_leaf.1, inner_index.1)
-//       } else {
-//           (inner_index.1, current_leaf.1)
-//       };
-
-//       // Concatenate and hash the two ordered values
-//       let concatenated_hash = format!("{}{}", first_leaf, second_leaf);
-//       let hash_result = hash_bytes(concatenated_hash.as_bytes());
-
-//       // Update current_leaf for the next iteration
-//       current_leaf = (first_index.0, hash_result.as_str());
-//   }
-
-//   // Check if the final result matches the root_leaf
-//   Ok(current_leaf.1 == root_leaf)
-// }

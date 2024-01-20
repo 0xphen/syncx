@@ -38,6 +38,8 @@ pub async fn run(syncx_client: &mut SyncxClient<tonic::transport::Channel>, cont
         Subcommands::CreateAccount(args) => {
             client::register_client(syncx_client, args.password, context).await;
         }
-        Subcommands::UploadFiles(args) => client::list_files(&args.directory),
+        Subcommands::UploadFiles(args) => {
+            client::upload_files(syncx_client, &args.directory, context).await
+        }
     }
 }
