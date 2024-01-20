@@ -22,7 +22,7 @@ impl Context {
 pub struct AppConfig {
     id: String,
     password: String,
-    jwt: String,
+    pub jwt: String,
     merkle_tree_root: String,
 }
 

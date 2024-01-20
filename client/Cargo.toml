@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.35.1", features = ["full"] }
-proto = {path = "../proto"}
+common = {path = "../common"}
 merkle-tree = {path = "../merkle-tree"}
 tonic = "0.10.2"
 thiserror = "1.0.56"

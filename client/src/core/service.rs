@@ -1,8 +1,8 @@
 pub mod client {
-    extern crate proto;
+    extern crate common;
 
     use crate::core::{context::Context, utils::*};
-    use proto::syncx::{
+    use common::syncx::{
         syncx_client::SyncxClient, CreateClientRequest, CreateClientResponse, FileUploadRequest,
     };
     use std::path::{Path, PathBuf};

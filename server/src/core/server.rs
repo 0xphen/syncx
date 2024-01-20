@@ -1,6 +1,6 @@
-extern crate proto;
+extern crate common;
 
-use proto::syncx::{
+use common::syncx::{
     syncx_server::Syncx, CreateClientRequest, CreateClientResponse, FileUploadRequest,
     FileUploadResponse,
 };

@@ -1,7 +1,7 @@
 pub mod subcommands;
 
 use crate::core::{context::Context, service::client};
-use proto::syncx::syncx_client::SyncxClient;
+use common::syncx::syncx_client::SyncxClient;
 use subcommands::*;
 
 use clap::{Parser, Subcommand};

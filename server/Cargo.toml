@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 tokio = "1.35.1"
-proto = {path = "../proto"}
+common = {path = "../common"}
 tonic = "0.10.2"
 thiserror = "1.0.56"
 mongodb = "2.8.0"

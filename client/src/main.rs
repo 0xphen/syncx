@@ -2,8 +2,8 @@ mod cli;
 mod core;
 
 use core::context::*;
-use proto::syncx::syncx_client::SyncxClient;
-use proto::syncx::CreateClientRequest;
+use common::syncx::syncx_client::SyncxClient;
+use common::syncx::CreateClientRequest;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

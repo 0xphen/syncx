@@ -6,7 +6,7 @@ use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use zip::{write::FileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
-use super::errors::SynxClientError;
+use super::errors::CommonError;
 
 /// Creates a ZIP archive from a collection of file paths, efficiently handling large files by streaming.
 ///
@@ -143,7 +143,7 @@ pub fn list_files_in_dir(dir_path: &PathBuf) -> io::Result<Vec<PathBuf>> {
     Ok(files)
 }
 
-// pub fn files_to_bytes<P: AsRef<Path>>(files: &Vec<P>) -> Result<Vec<Vec<u8>>, SynxClientError> {
+// pub fn files_to_bytes<P: AsRef<Path>>(files: &Vec<P>) -> Result<Vec<Vec<u8>>, CommonError> {
 //   let files_as_bytes = files.par_iter().map(|file| {
 
 //   })
@@ -199,23 +199,23 @@ pub fn file_to_bytes<P: AsRef<Path>>(path: P) -> io::Result<Vec<u8>> {
 ///
 /// # Returns
 ///
-/// Returns a `Result<MerkleTree, SynxClientError>`. On success, it contains the
+/// Returns a `Result<MerkleTree, CommonError>`. On success, it contains the
 /// Merkle tree constructed from the files' contents. On failure, it returns a
-/// `SynxClientError` indicating the type of error encountered, such as an issue
+/// `CommonError` indicating the type of error encountered, such as an issue
 /// reading the files.
 ///
 /// # Errors
 ///
 /// Returns an error if any file cannot be read or converted to bytes.
-pub fn generate_merkle_tree<P: AsRef<Path>>(paths: &Vec<P>) -> Result<MerkleTree, SynxClientError>
+pub fn generate_merkle_tree<P: AsRef<Path>>(paths: &Vec<P>) -> Result<MerkleTree, CommonError>
 where
     P: AsRef<Path> + Send + Sync,
 {
-    let leaf_bytes_results: Vec<Result<Vec<u8>, SynxClientError>> = paths
+    let leaf_bytes_results: Vec<Result<Vec<u8>, CommonError>> = paths
         .par_iter()
         .map(|path| {
             file_to_bytes(path.as_ref())
-                .map_err(|err| SynxClientError::FileToBytesConversionError(err.to_string()))
+                .map_err(|err| CommonError::FileToBytesConversionError(err.to_string()))
         })
         .collect();
 
@@ -309,7 +309,7 @@ mod tests {
 
         // Zip the file
         let zip_path = temp_dir.path().join("test.zip");
-        zip_files(&[&file_path], &zip_path)?;
+        zip_files(&[&file_path], &&zip_path)?;
 
         // Create another temporary directory for extraction
         let extract_dir = tempdir().unwrap();
