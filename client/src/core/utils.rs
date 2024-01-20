@@ -181,6 +181,6 @@ mod tests {
         assert!(leaf_hashes == MerkleTree::build_leaf_nodes(&leaf_bytes));
 
         // Verify the leaf nodes in the merkle tree
-        assert!(merkle_tree.nodes[0] == leaf_hashes);
+        assert!(merkle_tree.leaf_nodes() == &leaf_hashes);
     }
 }

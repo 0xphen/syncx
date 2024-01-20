@@ -124,6 +124,10 @@ impl MerkleTree {
         indexes.sort_by(|&b, &a| b.0.cmp(&a.0));
         (indexes[0].1, indexes[1].1)
     }
+
+    pub fn leaf_nodes(&self) -> &Vec<String> {
+        &self.nodes[0]
+    }
 }
 
 // pub fn verify(
