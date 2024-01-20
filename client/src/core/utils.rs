@@ -68,6 +68,29 @@ pub fn file_to_bytes<P: AsRef<Path>>(path: P) -> io::Result<Vec<u8>> {
     Ok(buffer)
 }
 
+/// Generates a Merkle tree from the contents of multiple files.
+///
+/// This function utilizes `rayon` for parallel processing, significantly improving
+/// performance when handling multiple files, particularly beneficial for large files
+/// or a large number of files. Each file is read in parallel and converted into a
+/// byte array, which forms the leaves of the Merkle tree.
+///
+/// # Arguments
+///
+/// * `paths` - A vector of paths (`Vec<P>`), where each path points to a file.
+///     `P` must implement `AsRef<Path>` and must be safe to send across threads
+///     (`Send`) and access from multiple threads (`Sync`).
+///
+/// # Returns
+///
+/// Returns a `Result<MerkleTree, SynxClientError>`. On success, it contains the
+/// Merkle tree constructed from the files' contents. On failure, it returns a
+/// `SynxClientError` indicating the type of error encountered, such as an issue
+/// reading the files.
+///
+/// # Errors
+///
+/// Returns an error if any file cannot be read or converted to bytes.
 pub fn generate_merkle_tree<P: AsRef<Path>>(paths: Vec<P>) -> Result<MerkleTree, SynxClientError>
 where
     P: AsRef<Path> + Send + Sync,
