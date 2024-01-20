@@ -4,6 +4,5 @@ members = [
   "merkle-tree",
   "client",
   "server",
-  "proto",
   "common"
 ]
