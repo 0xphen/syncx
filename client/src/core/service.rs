@@ -35,7 +35,7 @@ pub mod client {
     }
 
     pub fn list_files(path: &str) {
-        let files = list_dir_files(&PathBuf::from(path));
+        let files = list_files_in_dir(&PathBuf::from(path));
         println!("FILES: {:?}", files.unwrap());
     }
 }

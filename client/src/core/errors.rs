@@ -14,4 +14,7 @@ pub enum SynxClientError {
 
     #[error("Failed to generate merkle root")]
     MerkleRootGenerationError,
+
+    #[error("Failed to convert file to bytes:  {0}")]
+    FileToBytesConversionError(String),
 }
