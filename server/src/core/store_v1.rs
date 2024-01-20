@@ -205,6 +205,7 @@ mod tests {
 
     async fn setup() -> StoreV1 {
         dotenv::from_filename(".env.test").ok();
+        println!("TEST_REDIS_URL: {:?}", std::env::var("TEST_REDIS_URL"));
         let mut store_v1 = StoreV1::new(&DATABASE_URL, &REDIS_URL, &DB_NAME)
             .await
             .unwrap();

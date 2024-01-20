@@ -1,8 +1,9 @@
 pub mod client {
     extern crate proto;
 
-    use crate::core::context::Context;
+    use crate::core::{context::Context, utils::*};
     use proto::syncx::{syncx_client::SyncxClient, CreateClientRequest, CreateClientResponse};
+    use std::path::{Path, PathBuf};
 
     pub async fn register_client(
         syncx_client: &mut SyncxClient<tonic::transport::Channel>,
@@ -31,5 +32,10 @@ pub mod client {
                 panic!("Failed to create user account {:?}", e);
             }
         }
+    }
+
+    pub fn list_files(path: &str) {
+        let files = list_dir_files(&PathBuf::from(path));
+        println!("FILES: {:?}", files.unwrap());
     }
 }
