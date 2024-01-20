@@ -28,6 +28,8 @@ pub fn list_dir_files(path: &PathBuf) -> io::Result<Vec<PathBuf>> {
     Ok(files)
 }
 
+pub fn generate_merkle_root(path: &PathBuf) -> Result<String, SynxClientError> {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

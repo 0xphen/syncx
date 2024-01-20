@@ -11,4 +11,7 @@ pub enum SynxClientError {
 
     #[error("Failed to write to config file")]
     ConfigFileWriteError,
+
+    #[error("Failed to generate merkle root")]
+    MerkleRootGenerationError,
 }
