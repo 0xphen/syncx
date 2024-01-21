@@ -2,8 +2,8 @@ mod core;
 
 use tonic::transport::Server;
 
-use core::{config::Config, server::Server as InnerServer, store_v1::StoreV1};
 use common::syncx::syncx_server::SyncxServer;
+use core::{config::Config, server::Server as InnerServer, store_v1::StoreV1};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

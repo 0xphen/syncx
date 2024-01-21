@@ -231,10 +231,4 @@ mod tests {
 
         assert!(value == client);
     }
-
-    // #[tokio::test]
-    // async fn store_test() {
-    //   let store_v1 = setup().await;
-    //   let
-    // }
 }

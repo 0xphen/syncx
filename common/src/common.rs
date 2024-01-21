@@ -78,6 +78,7 @@ pub fn zip_files<P: AsRef<Path>>(file_paths: &[P], output_path: &P) -> io::Resul
     Ok(())
 }
 
+
 /// Extracts the contents of a ZIP file to a specified directory.
 ///
 /// This function opens a ZIP archive and extracts each entry (file or directory)
@@ -114,7 +115,8 @@ pub fn unzip_file<P: AsRef<Path>>(zip_path: P, extract_to: P) -> io::Result<()> 
                     std::fs::create_dir_all(&p)?;
                 }
             }
-            let mut outfile = BufWriter::new(File::create(&outpath)?);
+             let mut outfile = BufWriter::new(File::create(&outpath)?);
+            // let mut outfile = File::create(&outpath)?;
 
             // Decompression happens implicitly here as data is read from the ZIP archive
             io::copy(&mut file, &mut outfile)?;
@@ -142,12 +144,6 @@ pub fn list_files_in_dir(dir_path: &PathBuf) -> io::Result<Vec<PathBuf>> {
 
     Ok(files)
 }
-
-// pub fn files_to_bytes<P: AsRef<Path>>(files: &Vec<P>) -> Result<Vec<Vec<u8>>, CommonError> {
-//   let files_as_bytes = files.par_iter().map(|file| {
-
-//   })
-// }
 
 /// Reads a file and accumulates its contents into a `Vec<u8>`.
 ///
