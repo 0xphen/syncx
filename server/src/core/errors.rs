@@ -42,9 +42,8 @@ pub enum SynxServerError {
     #[error("Failed to parse int")]
     ParseIntError,
 
-    #[error("Failed to parse int")]
-    InvalidValueError,
-
+    // #[error("Failed to parse int")]
+    // InvalidValueError,
     #[error("Failed to hash password")]
     PasswordHashError,
 
@@ -54,9 +53,17 @@ pub enum SynxServerError {
     #[error("Failed to create client in MongoDB")]
     MongoDbClientCreationError,
 
-    #[error("Invalid JWT timestamp when creating claims")]
-    ClaimsTimestampError,
-
+    // #[error("Invalid JWT timestamp when creating claims")]
+    // ClaimsTimestampError,
     #[error("invalid jwt token")]
     InvalidJWTTokenError,
+
+    #[error("Failed to queue job id #{0}")]
+    DequeueJobError(String),
+
+    #[error("Failed to read file")]
+    ReadFileError,
+
+    #[error("File upload failed {0}")]
+    UploadFileRequestError(String),
 }

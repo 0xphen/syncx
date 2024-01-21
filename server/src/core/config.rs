@@ -9,6 +9,7 @@ pub struct Config {
     pub jwt_secret: String,
     pub jwt_exp: i64,
     pub db_name: String,
+    pub gcs_bucket_name: String,
 }
 
 impl Config {
@@ -27,7 +28,7 @@ impl Config {
             SynxServerError::InvalidServerSettings("JWT_SECRET not present".to_string())
         })?;
 
-        let mut jwt_exp = std::env::var("JWT_EXP").map_err(|_err| {
+        let jwt_exp = std::env::var("JWT_EXP").map_err(|_err| {
             SynxServerError::InvalidServerSettings("JWT_EXP not present".to_string())
         })?;
 
@@ -37,6 +38,10 @@ impl Config {
 
         let db_name = std::env::var("DB_NAME").map_err(|_err| {
             SynxServerError::InvalidServerSettings("DB_NAME not present".to_string())
+        })?;
+
+        let gcs_bucket_name = std::env::var("GCS_BUCKET_NAME").map_err(|_err| {
+            SynxServerError::InvalidServerSettings("GCS_BUCKET_NAME not present".to_string())
         })?;
 
         std::env::var("GOOGLE_APPLICATION_CREDENTIALS_JSON").map_err(|_err| {
@@ -54,6 +59,7 @@ impl Config {
             redis_url,
             jwt_secret,
             jwt_exp,
+            gcs_bucket_name,
             db_name,
         })
     }

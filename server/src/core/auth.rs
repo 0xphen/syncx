@@ -34,7 +34,7 @@ pub mod jwt {
     /// - There is an issue with the token's payload or header.
     /// - The system time cannot be retrieved or computed into an expiration timestamp.
     pub fn create_jwt(uid: &str, secret: &str, t: i64) -> Result<String, SynxServerError> {
-        let mut header = Header::new(Algorithm::HS512);
+        let header = Header::new(Algorithm::HS512);
 
         let exp = Utc::now()
             .checked_add_signed(chrono::Duration::seconds(t))
@@ -98,9 +98,7 @@ pub mod jwt {
 
 pub mod hash_utils {
     use argon2::{
-        password_hash::{
-            rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
-        },
+        password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
         Argon2,
     };
 

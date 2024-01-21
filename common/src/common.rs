@@ -1,5 +1,4 @@
-use merkle_tree::{merkle_tree::MerkleTree, utils::hash_bytes};
-use rayon::prelude::*;
+use merkle_tree::merkle_tree::MerkleTree;
 use rayon::prelude::*;
 use std::fs::{read_dir, File};
 use std::io::{self, BufReader, BufWriter, Read, Write};
@@ -78,7 +77,6 @@ pub fn zip_files<P: AsRef<Path>>(file_paths: &[P], output_path: &P) -> io::Resul
     Ok(())
 }
 
-
 /// Extracts the contents of a ZIP file to a specified directory.
 ///
 /// This function opens a ZIP archive and extracts each entry (file or directory)
@@ -115,8 +113,7 @@ pub fn unzip_file<P: AsRef<Path>>(zip_path: P, extract_to: P) -> io::Result<()> 
                     std::fs::create_dir_all(&p)?;
                 }
             }
-             let mut outfile = BufWriter::new(File::create(&outpath)?);
-            // let mut outfile = File::create(&outpath)?;
+            let mut outfile = BufWriter::new(File::create(&outpath)?);
 
             // Decompression happens implicitly here as data is read from the ZIP archive
             io::copy(&mut file, &mut outfile)?;
