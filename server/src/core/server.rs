@@ -41,7 +41,6 @@ impl<T> Server<T> {
     }
 
     async fn upload_file(&self, file_path: &Path, uid: &str) -> Result<()> {
-        let file_contents = fs::read(file_path).map_err(|_| SynxServerError::ReadFileError)?;
         let object_name = Self::gcs_file_path(&uid);
 
         let url = format!(

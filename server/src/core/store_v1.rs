@@ -1,14 +1,12 @@
 use super::{
     definitions::{ClientObject, Store, CACHE_POOL_TIMEOUT_SECONDS, JOB_QUEUE},
     errors::SynxServerError,
-    utils::*
+    utils::*,
 };
 
 use async_trait::async_trait;
 use mongodb::{bson::doc, Client};
-use r2d2_redis::{
-    redis::{cmd, Commands, Value},
-};
+use r2d2_redis::redis::{cmd, Commands, Value};
 use serde_json;
 
 use super::definitions::{R2D2Pool, RedisPool, Result};

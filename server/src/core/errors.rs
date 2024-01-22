@@ -42,8 +42,9 @@ pub enum SynxServerError {
     #[error("Failed to parse int")]
     ParseIntError,
 
-    // #[error("Failed to parse int")]
-    // InvalidValueError,
+    #[error("Failed to read response bytes")]
+    HttpReadBytesError,
+
     #[error("Failed to hash password")]
     PasswordHashError,
 

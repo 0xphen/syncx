@@ -3,27 +3,29 @@ use super::{
         R2D2Pool, RedisPool, Result, CACHE_POOL_TIMEOUT_SECONDS, DEFAULT_DIR, JOB_QUEUE,
     },
     errors::SynxServerError,
+    utils::extract_file_name_from_path,
 };
 use futures_util::stream::StreamExt;
+use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use r2d2_redis::redis::Commands;
 use reqwest;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-pub struct Queue {
+pub struct Worker {
     redis_pool: R2D2Pool,
 }
 
-impl RedisPool for Queue {
+impl RedisPool for Worker {
     fn get_pool(&self) -> &R2D2Pool {
         &self.redis_pool
     }
 }
 
-impl Queue {
+impl Worker {
     pub fn new(redis_pool: R2D2Pool) -> Self {
-        Queue { redis_pool }
+        Worker { redis_pool }
     }
 
     pub fn dequeue_job(&self) -> Result<String> {
@@ -57,55 +59,51 @@ impl Queue {
     }
 
     async fn process_job(job_data: String) {
-        // Process the job here
-        println!("Processing start: {}", job_data);
-        // Implement your job processing logic
         match Self::download_file(&job_data).await {
             Ok(file_path) => println!("File {:?} downloaded...", file_path),
-            Err(e) => println!("Download of {:?} failed...", job_data),
+            Err(_) => println!("Download of {:?} failed...", job_data),
         };
-        println!("Processing end: {}", job_data);
     }
 
-    async fn download_file(gcs_object_name: &str) -> Result<PathBuf> {
+    async fn download_file(object_name: &str) -> Result<PathBuf> {
         // It's safe to use `unwrap` here
         let bucket_name = std::env::var("GCS_BUCKET_NAME").unwrap();
-        let api_key = std::env::var("GOOGLE_STORAGE_API_KEY").unwrap();
+        let oauth2_token = std::env::var("GOOGLE_STORAGE_API_KEY").unwrap();
 
-        let url = format!(
+        const FRAGMENT: &AsciiSet = &CONTROLS.add(b'/');
+        let gcs_object_name = utf8_percent_encode(&object_name, FRAGMENT).to_string();
+
+        let mut url = format!(
             "https://storage.googleapis.com/storage/v1/b/{}/o/{}?alt=media",
             bucket_name, gcs_object_name
         );
 
         let client = reqwest::Client::new();
         let response = client
-            .get(url)
-            .bearer_auth(api_key)
+            .get(&url)
+            .bearer_auth(oauth2_token)
             .send()
             .await
             .map_err(|_| SynxServerError::DownloadError)?;
 
-        println!("Download response: {:?}", response);
+        let body = response
+            .bytes()
+            .await
+            .map_err(|_| SynxServerError::HttpReadBytesError)?;
 
         let parent_dir = Path::new(DEFAULT_DIR);
         let _ = fs::create_dir_all(parent_dir);
 
-        let sub_parent_dir = parent_dir.join("queue");
+        let sub_parent_dir = parent_dir.join("queued");
         let _ = fs::create_dir(&sub_parent_dir);
-        let file_path = sub_parent_dir.join(gcs_object_name);
 
-        let mut file = fs::OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(&file_path)
+        let file_path =
+            sub_parent_dir.join(extract_file_name_from_path(Path::new(object_name)).unwrap());
+
+        let mut file = fs::File::create(&file_path).unwrap();
+        file.write_all(&body)
             .map_err(|_| SynxServerError::FileOpenError)?;
 
-        let mut stream = response.bytes_stream();
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk.unwrap();
-            file.write_all(&chunk)
-                .map_err(|_| SynxServerError::WriteAllError)?;
-        }
         Ok(file_path)
     }
 }
