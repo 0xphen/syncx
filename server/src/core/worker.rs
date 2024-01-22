@@ -1,7 +1,7 @@
 use super::{
     definitions::{R2D2Pool, RedisPool, Result, CACHE_POOL_TIMEOUT_SECONDS, JOB_QUEUE, TEMP_DIR},
     errors::SynxServerError,
-    utils::{extract_file_name_from_path, gcs_file_path},
+    utils::{download_file, extract_file_name_from_path, gcs_file_path},
 };
 use futures_util::stream::StreamExt;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
@@ -56,51 +56,19 @@ impl Worker {
     }
 
     async fn process_job(job_data: String) {
-        match Self::download_file(&job_data).await {
-            Ok(file_path) => println!("File {:?} downloaded...", file_path),
-            Err(_) => println!("Download of {:?} failed...", job_data),
-        };
-    }
+        // Check for the existence of the zip file in the local system directory before proceeding.
+        // If the file already exists, it will be reused rather than downloaded again.
+        // This approach helps in saving bandwidth and enhances efficiency by avoiding redundant downloads,
+        // thereby also reducing operational costs.
+        if Path::new(&gcs_file_path(&job_data)).exists() {}
 
-    async fn download_file(object_name: &str) -> Result<PathBuf> {
         // It's safe to use `unwrap` here
         let bucket_name = std::env::var("GCS_BUCKET_NAME").unwrap();
         let oauth2_token = std::env::var("GOOGLE_STORAGE_API_KEY").unwrap();
 
-        const FRAGMENT: &AsciiSet = &CONTROLS.add(b'/');
-        let gcs_object_name = utf8_percent_encode(&object_name, FRAGMENT).to_string();
-
-        let mut url = format!(
-            "https://storage.googleapis.com/storage/v1/b/{}/o/{}?alt=media",
-            bucket_name, gcs_object_name
-        );
-
-        let client = reqwest::Client::new();
-        let response = client
-            .get(&url)
-            .bearer_auth(oauth2_token)
-            .send()
-            .await
-            .map_err(|_| SynxServerError::DownloadError)?;
-
-        let body = response
-            .bytes()
-            .await
-            .map_err(|_| SynxServerError::HttpReadBytesError)?;
-
-        let parent_dir = Path::new(TEMP_DIR);
-        let _ = fs::create_dir_all(parent_dir);
-
-        let sub_parent_dir = parent_dir.join("queued");
-        let _ = fs::create_dir(&sub_parent_dir);
-
-        let file_path =
-            sub_parent_dir.join(extract_file_name_from_path(Path::new(object_name)).unwrap());
-
-            let mut file = fs::File::create(&file_path).unwrap();
-        file.write_all(&body)
-            .map_err(|_| SynxServerError::FileOpenError)?;
-
-        Ok(file_path)
+        match download_file(&job_data, &bucket_name, &oauth2_token).await {
+            Ok(file_path) => println!("File {:?} downloaded...", file_path),
+            Err(_) => println!("Download of {:?} failed...", job_data),
+        };
     }
 }

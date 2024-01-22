@@ -19,7 +19,7 @@ use super::{
     auth,
     config::Config,
     definitions::{ClientObject, Result, Store, DEFAULT_ZIP_FILE, TEMP_DIR},
-    utils::gcs_file_path,
+    utils::{gcs_file_path, upload_file},
 };
 
 // #[derive(Debug, Clone)]
@@ -39,32 +39,6 @@ impl<T> Server<T> {
             config,
             http_client: reqwest::Client::new(),
         }
-    }
-
-    async fn upload_file(&self, file_path: &Path, uid: &str) -> Result<()> {
-        let object_name = gcs_file_path(&uid);
-
-        let url = format!(
-            "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name={}",
-            self.config.gcs_bucket_name, object_name
-        );
-
-        let api_key = std::env::var("GOOGLE_STORAGE_API_KEY").unwrap();
-
-        let _response = self
-            .http_client
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
-            .body(reqwest::Body::from(std::fs::read(file_path).map_err(
-                |err| SynxServerError::UploadFileRequestError(err.to_string()),
-            )?))
-            .send()
-            .await
-            .map_err(|err| SynxServerError::UploadFileRequestError(err.to_string()))?;
-
-        println!("Fil uploaded successfully {:?}", _response);
-
-        Ok(())
     }
 }
 
@@ -154,7 +128,15 @@ where
             message: "File uploaded successfully".into(),
         };
 
-        self.upload_file(&zip_path.unwrap(), &uid).await.unwrap();
+        let api_key = std::env::var("GOOGLE_STORAGE_API_KEY").unwrap();
+        upload_file(
+            &zip_path.unwrap(),
+            &uid,
+            &api_key,
+            &self.config.gcs_bucket_name,
+        )
+        .await
+        .unwrap();
 
         let value = gcs_file_path(&uid);
         let _ = self.store.enqueue_job(&value);

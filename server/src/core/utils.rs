@@ -6,9 +6,11 @@ use super::{
 };
 
 use mongodb::{options::ClientOptions, Client};
+use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use r2d2_redis::{r2d2, RedisConnectionManager};
 use std::fs;
-use std::path::Path;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use super::definitions::{R2D2Pool, Result};
@@ -53,6 +55,77 @@ pub fn connect_redis(url: &str) -> Result<R2D2Pool> {
         .map_err(|err| SynxServerError::RedisConnectionError(err.to_string()))?;
 
     Ok(pool_manager)
+}
+
+pub async fn download_file(
+    object_name: &str,
+    gcs_bucket_name: &str,
+    api_key: &str,
+) -> Result<PathBuf> {
+    const FRAGMENT: &AsciiSet = &CONTROLS.add(b'/');
+    let gcs_object_name = utf8_percent_encode(&object_name, FRAGMENT).to_string();
+
+    let mut url = format!(
+        "https://storage.googleapis.com/storage/v1/b/{}/o/{}?alt=media",
+        gcs_bucket_name, gcs_object_name
+    );
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&url)
+        .bearer_auth(api_key)
+        .send()
+        .await
+        .map_err(|_| SynxServerError::DownloadError)?;
+
+    let body = response
+        .bytes()
+        .await
+        .map_err(|_| SynxServerError::HttpReadBytesError)?;
+
+    let parent_dir = Path::new(TEMP_DIR);
+    let _ = fs::create_dir_all(parent_dir);
+
+    let sub_parent_dir = parent_dir.join("queued");
+    let _ = fs::create_dir(&sub_parent_dir);
+
+    let file_path =
+        sub_parent_dir.join(extract_file_name_from_path(Path::new(object_name)).unwrap());
+
+    let mut file = fs::File::create(&file_path).unwrap();
+    file.write_all(&body)
+        .map_err(|_| SynxServerError::FileOpenError)?;
+
+    Ok(file_path)
+}
+
+pub async fn upload_file(
+    file_path: &Path,
+    uid: &str,
+    api_key: &str,
+    gcs_bucket_name: &str,
+) -> Result<()> {
+    let object_name = gcs_file_path(&uid);
+
+    let url = format!(
+        "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name={}",
+        gcs_bucket_name, object_name
+    );
+
+    let client = reqwest::Client::new();
+    let _response = client
+        .post(&url)
+        .bearer_auth(api_key)
+        .body(reqwest::Body::from(std::fs::read(file_path).map_err(
+            |err| SynxServerError::UploadFileRequestError(err.to_string()),
+        )?))
+        .send()
+        .await
+        .map_err(|err| SynxServerError::UploadFileRequestError(err.to_string()))?;
+
+    println!("Fil uploaded successfully {:?}", _response);
+
+    Ok(())
 }
 
 pub fn extract_file_name_from_path(path: &Path) -> Option<String> {
