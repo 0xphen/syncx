@@ -8,6 +8,7 @@ use super::{
 };
 use common::common::{generate_merkle_tree, list_files_in_dir, unzip_file};
 use futures_util::stream::StreamExt;
+use log::{debug, error, info};
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use r2d2_redis::redis::Commands;
 use reqwest;
@@ -41,7 +42,7 @@ impl Worker {
     }
 
     pub async fn run_workers(&self) {
-        println!("Running workers...");
+        info!("Waiting on new jobs in redis queue");
 
         loop {
             match self.dequeue_job() {
@@ -71,15 +72,12 @@ impl Worker {
         // This approach helps in saving bandwidth and enhances efficiency by avoiding redundant downloads.
         let path = Path::new(&job_data);
         if path.exists() {
-            println!("Exists...: {}", id);
             Self::unzip_and_upload_all(path, &id, &oauth2_token, &bucket_name)
                 .await
                 .unwrap();
         } else {
-            print!("Not exists...: {}", id);
             match download_file(&job_data, &bucket_name, &oauth2_token).await {
                 Ok(file_path) => {
-                    println!("File {:?} downloaded...", file_path);
                     Self::unzip_and_upload_all(&file_path, &id, &oauth2_token, &bucket_name)
                         .await
                         .unwrap();

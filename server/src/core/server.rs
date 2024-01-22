@@ -7,6 +7,7 @@ use common::syncx::{
 
 use reqwest;
 
+use log::{debug, error, info};
 use std::fs;
 use std::fs::File;
 use std::io::Write;
@@ -51,14 +52,23 @@ where
         &self,
         request: Request<CreateClientRequest>,
     ) -> std::result::Result<Response<CreateClientResponse>, Status> {
+        info!("New request to register client");
+
         let id = (Uuid::new_v4()).to_string();
 
+        debug!("Generating JWT for account #{}", id);
+
         let jwt_token = auth::jwt::create_jwt(&id, &self.config.jwt_secret, self.config.jwt_exp)
-            .map_err(|_| Status::internal("Failed to create auth token"))?;
+            .map_err(|e| {
+                error!("Failed to generate JWT for account #{}. Error {}", id, e);
+                Status::internal("Failed to create auth token")
+            })?;
 
         let password = request.into_inner().password;
-        let hashed_password = auth::hash_utils::hash_password(&password)
-            .map_err(|_| Status::internal("Failed to hash password"))?;
+        let hashed_password = auth::hash_utils::hash_password(&password).map_err(|e| {
+            error!("Error hashing password for account #{}. Error {}", id, e);
+            Status::internal("Failed to hash password")
+        })?;
 
         let client_object = ClientObject {
             id: id.clone(),
@@ -68,7 +78,12 @@ where
         self.store
             .save_client_object(client_object)
             .await
-            .map_err(|_| Status::internal("Failed to save client object"))?;
+            .map_err(|e| {
+                error!("Error saving client object #{}. Error {}", id, e);
+                Status::internal("Failed to save client object")
+            })?;
+
+        debug!("New client #{} created", &id);
 
         let response = CreateClientResponse { id, jwt_token };
 
@@ -81,8 +96,8 @@ where
     ) -> std::result::Result<Response<FileUploadResponse>, Status> {
         let mut uid = String::new();
         let mut first_chunk = true;
+        info!("New client #{}request to upload files", uid);
 
-        //fs::create_dir_all(DEFAULT_DIR)?;
         // Create the outer directory if it doesn't exist
         let parent_dir = Path::new(TEMP_DIR);
         fs::create_dir_all(&parent_dir)?;
@@ -92,6 +107,9 @@ where
 
         let mut stream = request.into_inner();
         let mut all_chunks: Vec<u8> = Vec::new();
+
+        info!("Streaming and recreating file {}.zip", uid);
+
         while let Some(chunk) = stream.message().await? {
             if first_chunk {
                 match auth::jwt::verify_jwt(&chunk.jwt, &self.config.jwt_secret) {
@@ -99,8 +117,6 @@ where
                         uid = claims.sub;
 
                         // Create the inner directory within the outer directory
-                        // let inner_dir = outer_dir.join(&uid);
-                        // fs::create_dir(&inner_dir)?;
                         let file_path = parent_dir.join(format!("{}.zip", uid));
 
                         file = Some(
@@ -110,8 +126,13 @@ where
                                 .open(&file_path)?,
                         );
                         zip_path = Some(file_path);
+
+                        debug!("Zip file created {}/{}.zip", TEMP_DIR, uid);
                     }
-                    Err(_) => return Err(Status::internal("Authorization failed")),
+                    Err(_) => {
+                        error!("Un-authorized access with JWT {}", &chunk.jwt);
+                        return Err(Status::internal("Authorization failed"));
+                    }
                 };
                 first_chunk = false;
             }
@@ -141,6 +162,7 @@ where
 
         let value = gcs_file_path(&uid);
         let _ = self.store.enqueue_job(&value);
+        info!("New job <{}> queued", value);
 
         Ok(Response::new(response))
     }

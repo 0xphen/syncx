@@ -5,6 +5,7 @@ use super::{
     errors::SynxServerError,
 };
 
+use log::{debug, error, info};
 use mongodb::{options::ClientOptions, Client};
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use r2d2_redis::{r2d2, RedisConnectionManager};
@@ -33,26 +34,34 @@ use super::definitions::{R2D2Pool, Result};
 /// - The database URL is invalid or the server is unreachable (returns `DatabaseConnectionError`).
 /// - There's an error setting up the client options (returns `DbOptionsConfigurationError`).
 pub async fn connect_db(db_url: &str) -> Result<Client> {
-    let client_options = ClientOptions::parse(db_url)
-        .await
-        .map_err(|err| SynxServerError::DatabaseConnectionError(err.to_string()))?;
+    let client_options = ClientOptions::parse(db_url).await.map_err(|err| {
+        error!("Error connecting to database: Error {}", err);
+        SynxServerError::DatabaseConnectionError(err.to_string())
+    })?;
 
-    let client = Client::with_options(client_options)
-        .map_err(|err| SynxServerError::DbOptionsConfigurationError(err.to_string()))?;
+    let client = Client::with_options(client_options).map_err(|err| {
+        error!("Error creating database client: Error {}", err);
+        SynxServerError::DbOptionsConfigurationError(err.to_string())
+    })?;
 
     Ok(client)
 }
 
 pub fn connect_redis(url: &str) -> Result<R2D2Pool> {
-    let manager = RedisConnectionManager::new(url)
-        .map_err(|err| SynxServerError::RedisConnectionError(err.to_string()))?;
+    let manager = RedisConnectionManager::new(url).map_err(|err| {
+        error!("Error connecting to redis: Error {}", err);
+        SynxServerError::RedisConnectionError(err.to_string())
+    })?;
 
     let pool_manager = r2d2::Pool::builder()
         .max_size(CACHE_POOL_MAX_OPEN)
         .max_lifetime(Some(Duration::from_secs(CACHE_POOL_EXPIRE_SECONDS)))
         .min_idle(Some(CACHE_POOL_MIN_IDLE))
         .build(manager)
-        .map_err(|err| SynxServerError::RedisConnectionError(err.to_string()))?;
+        .map_err(|err| {
+            error!("Error creating redis pool: Error {}", err);
+            SynxServerError::RedisConnectionError(err.to_string())
+        })?;
 
     Ok(pool_manager)
 }
@@ -62,6 +71,8 @@ pub async fn download_file(
     gcs_bucket_name: &str,
     api_key: &str,
 ) -> Result<PathBuf> {
+    info!("Attempting to download file {:?} from storage", object_name);
+
     const FRAGMENT: &AsciiSet = &CONTROLS.add(b'/');
     let gcs_object_name = utf8_percent_encode(&object_name, FRAGMENT).to_string();
 
@@ -76,12 +87,21 @@ pub async fn download_file(
         .bearer_auth(api_key)
         .send()
         .await
-        .map_err(|_| SynxServerError::DownloadError)?;
+        .map_err(|e| {
+            error!("File download failed: Error {}", e);
+            SynxServerError::DownloadError
+        })?;
 
-    let body = response
-        .bytes()
-        .await
-        .map_err(|_| SynxServerError::HttpReadBytesError)?;
+    debug!(
+        "File {:?} downloaded successfully with status_code {}",
+        gcs_object_name,
+        response.status()
+    );
+
+    let body = &response.bytes().await.map_err(|e| {
+        error!("Error reading downloaded bytes: Error {}", e);
+        SynxServerError::HttpReadBytesError
+    })?;
 
     let parent_dir = Path::new(TEMP_DIR);
     let _ = fs::create_dir_all(parent_dir);
@@ -93,8 +113,10 @@ pub async fn download_file(
         sub_parent_dir.join(extract_file_name_from_path(Path::new(object_name)).unwrap());
 
     let mut file = fs::File::create(&file_path).unwrap();
-    file.write_all(&body)
-        .map_err(|_| SynxServerError::FileOpenError)?;
+    file.write_all(&body).map_err(|e| {
+        error!("Error creating file from downloaded bytes: Error {}", e);
+        SynxServerError::FileOpenError
+    })?;
 
     Ok(file_path)
 }
@@ -106,23 +128,35 @@ pub async fn upload_file(
     gcs_bucket_name: &str,
     object_name: &str,
 ) -> Result<()> {
+    info!("Attempting to upload file {:?}", file_path);
+
     let url = format!(
         "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name={}",
         gcs_bucket_name, object_name
     );
 
     let client = reqwest::Client::new();
-    let _response = client
+    let response = client
         .post(&url)
         .bearer_auth(api_key)
         .body(reqwest::Body::from(std::fs::read(file_path).map_err(
-            |err| SynxServerError::UploadFileRequestError(err.to_string()),
+            |err| {
+                error!("File upload failed: Error {}", err);
+                SynxServerError::UploadFileRequestError(err.to_string())
+            },
         )?))
         .send()
         .await
-        .map_err(|err| SynxServerError::UploadFileRequestError(err.to_string()))?;
+        .map_err(|err| {
+            error!("File upload failed: Error {}", err);
+            SynxServerError::UploadFileRequestError(err.to_string())
+        })?;
 
-    println!("Fil uploaded successfully {:?}", _response);
+    info!(
+        "File {:?} uploaded successfully with status_code {}",
+        file_path,
+        response.status()
+    );
 
     Ok(())
 }

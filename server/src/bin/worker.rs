@@ -1,3 +1,4 @@
+use common::common::logger_init;
 use core::panic;
 use futures_util::stream::StreamExt;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
@@ -9,6 +10,8 @@ use tokio;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    logger_init(Some(&std::env::var("LOG_CONFIG").unwrap()));
+
     let config =
         Config::load_config().unwrap_or_else(|e| panic!("Failed to load configuration: {}", e));
 

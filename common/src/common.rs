@@ -1,3 +1,4 @@
+use env_logger::{Builder, Env};
 use merkle_tree::merkle_tree::MerkleTree;
 use rayon::prelude::*;
 use std::fs::{read_dir, File};
@@ -320,4 +321,8 @@ mod tests {
         assert_eq!(original_contents, extracted_contents);
         Ok(())
     }
+}
+
+pub fn logger_init(default: Option<&str>) {
+    Builder::from_env(Env::default().default_filter_or(default.unwrap_or("warn"))).init();
 }

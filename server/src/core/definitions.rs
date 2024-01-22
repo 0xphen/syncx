@@ -1,6 +1,7 @@
 use super::errors::SynxServerError;
 
 use async_trait::async_trait;
+use log::error;
 use r2d2_redis::{r2d2, RedisConnectionManager};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -42,7 +43,7 @@ pub trait RedisPool {
         self.get_pool()
             .get_timeout(Duration::from_secs(timeout))
             .map_err(|e| {
-                eprintln!("error connecting to redis: {}", e);
+                error!("error connecting to redis: {}", e);
                 SynxServerError::RedisPoolError(e.to_string())
             })
     }

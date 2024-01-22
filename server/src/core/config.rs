@@ -50,8 +50,18 @@ impl Config {
             )
         })?;
 
-        std::env::var("GOOGLE_STORAGE_API_KEY").map_err(|_err| {
-            SynxServerError::InvalidServerSettings("GOOGLE_STORAGE_API_KEY not present".to_string())
+        std::env::var("GOOGLE_APPLICATION_CREDENTIALS_JSON").map_err(|_err| {
+            SynxServerError::InvalidServerSettings(
+                "GOOGLE_APPLICATION_CREDENTIALS_JSON not present".to_string(),
+            )
+        })?;
+
+        std::env::var("SERVER_ADDR").map_err(|_err| {
+            SynxServerError::InvalidServerSettings("SERVER_ADDR not present".to_string())
+        })?;
+
+        std::env::var("LOG_CONFIG").map_err(|_err| {
+            SynxServerError::InvalidServerSettings("LOG_CONFIG not present".to_string())
         })?;
 
         Ok(Config {

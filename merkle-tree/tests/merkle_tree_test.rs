@@ -2,7 +2,6 @@ mod common;
 
 use common::*;
 use merkle_tree::merkle_tree::MerkleTree;
-use std::collections::HashMap;
 
 #[cfg(test)]
 mod tests {
