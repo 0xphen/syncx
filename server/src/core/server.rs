@@ -134,6 +134,7 @@ where
             &uid,
             &api_key,
             &self.config.gcs_bucket_name,
+            &gcs_file_path(&uid),
         )
         .await
         .unwrap();

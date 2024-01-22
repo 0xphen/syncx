@@ -104,9 +104,8 @@ pub async fn upload_file(
     uid: &str,
     api_key: &str,
     gcs_bucket_name: &str,
+    object_name: &str,
 ) -> Result<()> {
-    let object_name = gcs_file_path(&uid);
-
     let url = format!(
         "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name={}",
         gcs_bucket_name, object_name
