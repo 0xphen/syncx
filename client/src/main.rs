@@ -1,12 +1,16 @@
 mod cli;
 mod core;
 
-use common::syncx::syncx_client::SyncxClient;
-use common::syncx::CreateClientRequest;
+use common::{
+    common::logger_init,
+    syncx::{syncx_client::SyncxClient, CreateClientRequest},
+};
 use core::context::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    logger_init(Some("info"));
+
     let app_config_path = AppConfig::get_config_path()
         .unwrap_or_else(|e| panic!("Failed to get client config path {}", e));
 

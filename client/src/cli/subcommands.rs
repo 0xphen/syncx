@@ -16,3 +16,15 @@ pub struct UploadFilesArgs {
     #[clap(long = "directory", short = 'd')]
     pub directory: String,
 }
+
+#[derive(Debug, Clone, Parser, Builder)]
+#[clap(about = "Download a file from the syncx server")]
+pub struct DownloadFileArgs {
+    #[clap(required = true)]
+    #[clap(long = "filename", short = 'f')]
+    pub filename: String,
+
+    #[clap(required = true)]
+    #[clap(long = "directory", short = 'd')]
+    pub directory: String,
+}

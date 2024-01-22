@@ -1,10 +1,14 @@
 extern crate common;
 
-use common::syncx::{
-    syncx_server::Syncx, CreateClientRequest, CreateClientResponse, FileUploadRequest,
-    FileUploadResponse,
+use common::{
+    common::{file_to_bytes, generate_merkle_tree},
+    syncx::{
+        syncx_server::Syncx, CreateClientRequest, CreateClientResponse, FileDownloadRequest,
+        FileDownloadResponse, FileUploadRequest, FileUploadResponse,
+    },
 };
-
+use merkle_tree::{merkle_tree::MerkleTree, utils::hash_bytes};
+use rayon::prelude::*;
 use reqwest;
 
 use log::{debug, error, info};
@@ -12,6 +16,8 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
@@ -19,8 +25,8 @@ use super::errors::SynxServerError;
 use super::{
     auth,
     config::Config,
-    definitions::{ClientObject, Result, Store, TEMP_DIR},
-    utils::{gcs_file_path, upload_file},
+    definitions::{ClientObject, Result, Store, TEMP_DIR, WIP_DOWNLOADS_DIR},
+    utils::*,
 };
 
 // #[derive(Debug, Clone)]
@@ -48,6 +54,8 @@ impl<T> Syncx for Server<T>
 where
     T: Store + Send + Sync + 'static,
 {
+    type DownloadFileStream = ReceiverStream<std::result::Result<FileDownloadResponse, Status>>;
+
     async fn register_client(
         &self,
         request: Request<CreateClientRequest>,
@@ -106,7 +114,7 @@ where
         let mut zip_path: Option<PathBuf> = None;
 
         let mut stream = request.into_inner();
-        let mut all_chunks: Vec<u8> = Vec::new();
+        // let mut all_chunks: Vec<u8> = Vec::new();
 
         info!("Streaming and recreating file {}.zip", uid);
 
@@ -139,7 +147,7 @@ where
 
             if let Some(ref mut f) = file {
                 f.write_all(&chunk.content)?;
-                all_chunks.extend(&chunk.content);
+                // all_chunks.extend(&chunk.content);
             } else {
                 return Err(Status::internal("File not initialized"));
             }
@@ -149,21 +157,106 @@ where
             message: "File uploaded successfully".into(),
         };
 
-        let api_key = std::env::var("GOOGLE_STORAGE_API_KEY").unwrap();
         upload_file(
             &zip_path.unwrap(),
             &uid,
-            &api_key,
+            &self.config.api_key,
             &self.config.gcs_bucket_name,
-            &gcs_file_path(&uid),
+            &gcs_zip_path(&uid),
         )
         .await
         .unwrap();
 
-        let value = gcs_file_path(&uid);
+        let value = gcs_zip_path(&uid);
         let _ = self.store.enqueue_job(&value);
         info!("New job <{}> queued", value);
 
         Ok(Response::new(response))
+    }
+
+    async fn download_file(
+        &self,
+        request: tonic::Request<FileDownloadRequest>,
+    ) -> std::result::Result<Response<Self::DownloadFileStream>, Status> {
+        let FileDownloadRequest { jwt, file_name } = request.into_inner();
+        match auth::jwt::verify_jwt(&jwt, &self.config.jwt_secret) {
+            Ok(claims) => {
+                let value = self.store.fetch_from_cache(&claims.sub).map_err(|err| {
+                    error!("Error getting value of key {} from redis", &file_name);
+                    Status::internal("Internal server error")
+                })?;
+
+                println!("VALUE IN CACHE: {:?} == {:?}", claims.sub, file_name);
+
+                // If file does not exists in cache, it means user has not uploaded such file.
+                if value.is_none() {
+                    return Err(Status::internal(format!("File {} not found", file_name)));
+                }
+
+                let download_path = parse_path_from_slice(&vec![WIP_DOWNLOADS_DIR, &claims.sub]);
+
+                let download_path = Path::new(download_path.as_path());
+                fs::create_dir_all(&download_path)?;
+
+                let file_1 = gsc_object_name(&claims.sub, &file_name);
+                let path_1 = download_path.join(&file_name);
+
+                let file_2 = gsc_object_name(&claims.sub, "merkletree.txt");
+                let path_2 = download_path.join("merkletree.txt");
+
+                let files_and_download_path = vec![(file_1, path_1), (file_2, path_2)];
+
+                let download_paths: Vec<PathBuf> = vec![];
+                for (name, path) in files_and_download_path {
+                    println!("SEE: {:?} {:?}", &gsc_object_name(&claims.sub, &name), name);
+                    let f = download_file(
+                        &name,
+                        &self.config.gcs_bucket_name,
+                        &self.config.api_key,
+                        path.as_path(),
+                    )
+                    .await
+                    .map_err(|err| {
+                        error!("Error downloading file {}. Err: {}", file_name, err);
+                        Status::internal("Internal server error")
+                    })?;
+                }
+
+                let content = file_to_bytes(&download_paths[0])
+                    .map_err(|_| Status::internal("Internal server error"))?;
+
+                let merkle_tree_bytes = file_to_bytes(&download_paths[1])
+                    .map_err(|_| Status::internal("Internal server error"))?;
+
+                let merkle_tree = MerkleTree::from_bytes(&merkle_tree_bytes)
+                    .map_err(|_| Status::internal("Internal server error"))?;
+
+                let merkle_proof = merkle_tree
+                    .generate_merkle_proof(&hash_bytes(&content))
+                    .map_err(|_| {
+                        Status::internal("Internal server error. Error generating merkle proof")
+                    })?;
+
+                // let merkle_tree = generate_merkle_tree
+                let (mut tx, rx) = mpsc::channel(4);
+                // Here, spawn a new task to handle file reading and streaming
+                tokio::spawn(async move {
+                    let chunk = FileDownloadResponse {
+                        content,
+                        merkle_proof,
+                    };
+
+                    tx.send(Ok(chunk))
+                        .await
+                        .map_err(|_| Status::internal("Internal server error"));
+                });
+
+                Ok(Response::new(Self::DownloadFileStream::new(rx)))
+            }
+            Err(_) => {
+                error!("Un-authorized access with JWT {}", &jwt);
+                Err(Status::internal("Authorization failed"))
+            }
+        }
     }
 }

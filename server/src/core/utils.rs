@@ -1,6 +1,7 @@
 use super::{
     definitions::{
-        CACHE_POOL_EXPIRE_SECONDS, CACHE_POOL_MAX_OPEN, CACHE_POOL_MIN_IDLE, QUEUE_DIR, TEMP_DIR,
+        CACHE_POOL_EXPIRE_SECONDS, CACHE_POOL_MAX_OPEN, CACHE_POOL_MIN_IDLE, GCS_PARENT_DIR,
+        TEMP_DIR,
     },
     errors::SynxServerError,
 };
@@ -70,7 +71,8 @@ pub async fn download_file(
     object_name: &str,
     gcs_bucket_name: &str,
     api_key: &str,
-) -> Result<PathBuf> {
+    output_path: &Path,
+) -> Result<()> {
     info!("Attempting to download file {:?} from storage", object_name);
 
     const FRAGMENT: &AsciiSet = &CONTROLS.add(b'/');
@@ -103,22 +105,15 @@ pub async fn download_file(
         SynxServerError::HttpReadBytesError
     })?;
 
-    let parent_dir = Path::new(TEMP_DIR);
-    let _ = fs::create_dir_all(parent_dir);
+    println!("***SEE output_path***: {:?}", output_path);
 
-    let sub_parent_dir = parent_dir.join("queued");
-    let _ = fs::create_dir(&sub_parent_dir);
-
-    let file_path =
-        sub_parent_dir.join(extract_file_name_from_path(Path::new(object_name)).unwrap());
-
-    let mut file = fs::File::create(&file_path).unwrap();
+    let mut file = fs::File::create(&output_path).unwrap();
     file.write_all(&body).map_err(|e| {
         error!("Error creating file from downloaded bytes: Error {}", e);
         SynxServerError::FileOpenError
     })?;
 
-    Ok(file_path)
+    Ok(())
 }
 
 pub async fn upload_file(
@@ -185,6 +180,15 @@ pub fn delete_file_or_dir(path: &Path) -> std::io::Result<()> {
     }
 }
 
-pub fn gcs_file_path(id: &str) -> String {
+pub fn gcs_zip_path(id: &str) -> String {
     format!("{}/{}.zip", TEMP_DIR, id)
+}
+
+pub fn gsc_object_name(id: &str, file_name: &str) -> String {
+    format!("{}/{}/{}", GCS_PARENT_DIR, id, file_name)
+}
+
+pub fn parse_path_from_slice(tokens: &Vec<&str>) -> PathBuf {
+    let path_str = tokens.iter().map(|s| s.to_string()).collect::<String>();
+    Path::new(&path_str).to_path_buf()
 }

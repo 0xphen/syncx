@@ -12,9 +12,9 @@ pub type R2D2Con = r2d2::PooledConnection<RedisConnectionManager>;
 
 pub const CACHE_POOL_TIMEOUT_SECONDS: u64 = 1;
 pub const TEMP_DIR: &str = "temp";
-pub const QUEUE_DIR: &str = "temp";
-pub const GCS_PARENT_DIR: &str = "files";
-pub const PENDING_UPLOADS_DIR: &str = "temp/pending_uploads";
+pub const GCS_PARENT_DIR: &str = "backup";
+pub const WIP_UPLOADS_DIR: &str = "wip/pending_uploads/";
+pub const WIP_DOWNLOADS_DIR: &str = "wip/pending_downloads/";
 pub const DEFAULT_ZIP_FILE: &str = "uploads.zip";
 pub const MERKLE_DIR: &str = "temp/merkle_trees";
 pub const JOB_QUEUE: &str = "syncx_queue";
@@ -31,6 +31,8 @@ pub struct ClientObject {
 #[async_trait]
 pub trait Store {
     async fn get_client_object(&self, id: &str) -> Result<Option<ClientObject>>;
+
+    fn fetch_from_cache(&self, key: &str) -> Result<Option<String>>;
 
     async fn save_client_object(&self, client_object: ClientObject) -> Result<bool>;
 

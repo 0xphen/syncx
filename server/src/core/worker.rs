@@ -1,10 +1,10 @@
 use super::{
     definitions::{
         R2D2Pool, RedisPool, Result, CACHE_POOL_TIMEOUT_SECONDS, GCS_PARENT_DIR, JOB_QUEUE,
-        MERKLE_DIR, PENDING_UPLOADS_DIR, TEMP_DIR,
+        MERKLE_DIR, TEMP_DIR, WIP_UPLOADS_DIR,
     },
     errors::SynxServerError,
-    utils::{download_file, extract_file_name_from_path, gcs_file_path, upload_file},
+    utils::*,
 };
 use common::common::{generate_merkle_tree, list_files_in_dir, unzip_file};
 use futures_util::stream::StreamExt;
@@ -15,9 +15,10 @@ use reqwest;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 pub struct Worker {
-    redis_pool: R2D2Pool,
+    redis_pool: Arc<R2D2Pool>,
 }
 
 impl RedisPool for Worker {
@@ -27,7 +28,7 @@ impl RedisPool for Worker {
 }
 
 impl Worker {
-    pub fn new(redis_pool: R2D2Pool) -> Self {
+    pub fn new(redis_pool: Arc<R2D2Pool>) -> Self {
         Worker { redis_pool }
     }
 
@@ -41,15 +42,26 @@ impl Worker {
         Ok(v)
     }
 
-    pub async fn run_workers(&self) {
+    fn cache_file_name(&self, key: &str, value: &str) -> Result<()> {
+        let mut conn = self.get_redis_connection(CACHE_POOL_TIMEOUT_SECONDS)?;
+
+        let x = conn.set::<&str, &str, String>(key, value).unwrap();
+
+        info!("Saved filename {} to redis.", value);
+
+        Ok(())
+    }
+
+    pub async fn run_workers(self: Arc<Self>) {
         info!("Waiting on new jobs in redis queue");
 
         loop {
             match self.dequeue_job() {
                 Ok(job) => {
                     debug!("Processing new job: <{}>", job);
+                    let worker_clone = self.clone();
                     tokio::spawn(async move {
-                        Self::process_job(job).await;
+                        worker_clone.process_job(job).await;
                     });
                 }
                 Err(e) => {
@@ -60,7 +72,7 @@ impl Worker {
         }
     }
 
-    async fn process_job(job_data: String) {
+    async fn process_job(&self, job_data: String) {
         let id = Self::extract_id_from_job_v(&job_data);
 
         // It's safe to use `unwrap` here
@@ -72,13 +84,16 @@ impl Worker {
         // This approach helps in saving bandwidth and enhances efficiency by avoiding redundant downloads.
         let path = Path::new(&job_data);
         if path.exists() {
-            Self::unzip_and_upload_all(path, &id, &oauth2_token, &bucket_name)
+            self.unzip_and_upload_all(path, &id, &oauth2_token, &bucket_name)
                 .await
                 .unwrap();
         } else {
-            match download_file(&job_data, &bucket_name, &oauth2_token).await {
-                Ok(file_path) => {
-                    Self::unzip_and_upload_all(&file_path, &id, &oauth2_token, &bucket_name)
+            let file_name = extract_file_name_from_path(Path::new(path)).unwrap();
+            let download_path = parse_path_from_slice(&vec![TEMP_DIR, "queued", &file_name]);
+
+            match download_file(&job_data, &bucket_name, &oauth2_token, &download_path).await {
+                Ok(()) => {
+                    self.unzip_and_upload_all(&download_path, &id, &oauth2_token, &bucket_name)
                         .await
                         .unwrap();
                 }
@@ -96,12 +111,13 @@ impl Worker {
     }
 
     async fn unzip_and_upload_all(
+        &self,
         zip_path: &Path,
         id: &str,
         api_key: &str,
         bucket_name: &str,
     ) -> Result<()> {
-        let parent_path = Path::new(PENDING_UPLOADS_DIR);
+        let parent_path = Path::new(WIP_UPLOADS_DIR);
         fs::create_dir_all(&parent_path).map_err(|_| SynxServerError::CreateDirectoryError)?;
         let output_path = parent_path.join(id);
 
@@ -109,7 +125,7 @@ impl Worker {
 
         let mut files_to_upload = list_files_in_dir(&output_path.to_path_buf())
             .map_err(|_| SynxServerError::ListFilesError)?;
-          
+
         info!("Files to upload: {:?}", files_to_upload);
 
         // Generate the merkle tree from the files to be uploaded
@@ -130,7 +146,7 @@ impl Worker {
             SynxServerError::CreateDirectoryError
         });
 
-        let merkle_file_path = parent_dir.join(format!("{}.txt", id));
+        let merkle_file_path = parent_dir.join("merkletree.txt");
 
         let mut file = fs::File::create(&merkle_file_path).map_err(|e| {
             error!("Error creating merkle tree file: Error {}", e);
@@ -148,12 +164,16 @@ impl Worker {
         let mut count = 0;
         for (i, path) in files_to_upload.iter().enumerate() {
             let file_name = path.as_path().file_name().unwrap().to_string_lossy();
-            let object_name = format!("{}/{}/{}", GCS_PARENT_DIR, id, file_name);
+            let object_name = gsc_object_name(&id, &file_name);
 
             upload_file(&path.as_path(), &id, api_key, bucket_name, &object_name).await?;
             count += 1;
-        }
 
+            // We cache the file name to redis for fast lookup. Excluding the "merkletree.txt" file
+            if file_name != "merkletree.txt" {
+                self.cache_file_name(id, &file_name);
+            }
+        }
         info!("{} files uploaded", count);
         Ok(())
     }
