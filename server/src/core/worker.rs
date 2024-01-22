@@ -42,12 +42,12 @@ impl Worker {
         Ok(v)
     }
 
-    fn cache_file_name(&self, key: &str, value: &str) -> Result<()> {
+    fn cache_file_name(&self, key: &str) -> Result<()> {
         let mut conn = self.get_redis_connection(CACHE_POOL_TIMEOUT_SECONDS)?;
 
-        let x = conn.set::<&str, &str, String>(key, value).unwrap();
+        let x = conn.set::<&str, bool, String>(key, true).unwrap();
 
-        info!("Saved filename {} to redis.", value);
+        info!("Saved filename {} to redis.", key);
 
         Ok(())
     }
@@ -171,7 +171,7 @@ impl Worker {
 
             // We cache the file name to redis for fast lookup. Excluding the "merkletree.txt" file
             if file_name != "merkletree.txt" {
-                self.cache_file_name(id, &file_name);
+                self.cache_file_name(id);
             }
         }
         info!("{} files uploaded", count);
