@@ -20,10 +20,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|e| panic!("Failed to initialize StoreV1: {}", e));
 
     let job_queue = Arc::new(Queue::new(redis_client.clone()));
-    tokio::spawn(async move {
-        job_queue.clone().run_workers().await;
-    });
-
+    // tokio::spawn(async move {
+    //     job_queue.clone().run_workers().await;
+    // });
+    println!("Before...");
+    job_queue.clone().run_workers().await;
+    println!("AFTER...");
     // Set up the server
     let server = InnerServer::new(store_v1, config).await;
 

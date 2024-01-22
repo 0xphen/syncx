@@ -10,10 +10,7 @@ use reqwest;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::path::{Path, PathBuf};
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
@@ -70,7 +67,7 @@ impl<T> Server<T> {
         Ok(())
     }
 
-    pub fn gcs_file_path(id: &str) -> (String) {
+    pub fn gcs_file_path(id: &str) -> String {
         format!("{}/{}.zip", TEMP_DIR, id)
     }
 }
@@ -153,7 +150,6 @@ where
                 f.write_all(&chunk.content)?;
                 all_chunks.extend(&chunk.content);
             } else {
-                // Handle the error: file should have been initialized at this point
                 return Err(Status::internal("File not initialized"));
             }
         }

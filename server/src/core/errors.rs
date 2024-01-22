@@ -53,8 +53,9 @@ pub enum SynxServerError {
     #[error("Failed to create client in MongoDB")]
     MongoDbClientCreationError,
 
-    // #[error("Invalid JWT timestamp when creating claims")]
-    // ClaimsTimestampError,
+    #[error("Invalid JWT timestamp when creating claims")]
+    DownloadError,
+
     #[error("invalid jwt token")]
     InvalidJWTTokenError,
 
@@ -63,6 +64,12 @@ pub enum SynxServerError {
 
     #[error("Failed to read file")]
     ReadFileError,
+
+    #[error("Failed to write to file")]
+    WriteAllError,
+
+    #[error("Failed to open file")]
+    FileOpenError,
 
     #[error("File upload failed {0}")]
     UploadFileRequestError(String),
