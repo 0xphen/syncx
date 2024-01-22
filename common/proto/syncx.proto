@@ -4,6 +4,7 @@ package syncx;
 
 service Syncx {
   rpc RegisterClient(CreateClientRequest) returns (CreateClientResponse) {}
+  rpc UploadFiles(stream FileUploadRequest) returns (FileUploadResponse);
 }
 
 message CreateClientRequest {
@@ -13,4 +14,13 @@ message CreateClientRequest {
 message CreateClientResponse {
     string id = 1;
     string jwt_token = 2;
+}
+
+message FileUploadRequest {
+  string jwt = 1;
+  bytes content = 2;
+}
+
+message FileUploadResponse {
+  string message = 1;
 }

@@ -1,5 +1,5 @@
 #[derive(thiserror::Error, Debug)]
-pub enum SynxClientError {
+pub enum CommonError {
     #[error("Failed to register client: {0}")]
     ClientRegistrationError(String),
 

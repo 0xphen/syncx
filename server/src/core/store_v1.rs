@@ -1,29 +1,17 @@
-use super::{definitions::ClientObject, definitions::Store, errors::SynxServerError};
+use super::{
+    definitions::{ClientObject, Store, CACHE_POOL_TIMEOUT_SECONDS, JOB_QUEUE},
+    errors::SynxServerError,
+    utils::*
+};
 
 use async_trait::async_trait;
-use mongodb::{
-    bson::{doc, to_document},
-    options::ClientOptions,
-    Client,
-};
+use mongodb::{bson::doc, Client};
 use r2d2_redis::{
-    r2d2,
-    redis::{cmd, Commands, FromRedisValue, Value},
-    RedisConnectionManager,
+    redis::{cmd, Commands, Value},
 };
-use redis::RedisResult;
 use serde_json;
-use std::{thread::sleep, time::Duration};
 
-use super::definitions::Result;
-
-pub type R2D2Pool = r2d2::Pool<RedisConnectionManager>;
-pub type R2D2Con = r2d2::PooledConnection<RedisConnectionManager>;
-
-const CACHE_POOL_MAX_OPEN: u32 = 16;
-const CACHE_POOL_MIN_IDLE: u32 = 8;
-const CACHE_POOL_TIMEOUT_SECONDS: u64 = 1;
-const CACHE_POOL_EXPIRE_SECONDS: u64 = 60;
+use super::definitions::{R2D2Pool, RedisPool, Result};
 
 pub struct StoreV1 {
     db_client: Client,
@@ -31,59 +19,23 @@ pub struct StoreV1 {
     redis_pool: R2D2Pool,
 }
 
+impl RedisPool for StoreV1 {
+    fn get_pool(&self) -> &R2D2Pool {
+        &self.redis_pool
+    }
+}
+
 impl StoreV1 {
     /// Creates a new `StoreV1` instance connected to the specified database URL.
-    pub async fn new(db_url: &str, redis_url: &str, db_name: &str) -> Result<Self> {
-        let db_client = Self::connect_db(db_url).await?;
-        let redis_pool = Self::connect_redis(redis_url)?;
+    pub async fn new(db_client: Client, redis_pool: R2D2Pool, db_name: &str) -> Result<Self> {
+        // let db_client = Self::connect_db(db_url).await?;
+        // let redis_pool = Self::connect_redis(redis_url)?;
 
         Ok(Self {
-            db_client,
             db_name: db_name.to_string(),
             redis_pool,
+            db_client,
         })
-    }
-
-    fn connect_redis(url: &str) -> Result<R2D2Pool> {
-        let manager = RedisConnectionManager::new(url)
-            .map_err(|err| SynxServerError::RedisConnectionError(err.to_string()))?;
-
-        let pool_manager = r2d2::Pool::builder()
-            .max_size(CACHE_POOL_MAX_OPEN)
-            .max_lifetime(Some(Duration::from_secs(CACHE_POOL_EXPIRE_SECONDS)))
-            .min_idle(Some(CACHE_POOL_MIN_IDLE))
-            .build(manager)
-            .map_err(|err| SynxServerError::RedisConnectionError(err.to_string()))?;
-
-        Ok(pool_manager)
-    }
-
-    /// Asynchronously creates a database client connection.
-    /// Establishes a connection to the database specified by `db_url`.
-    /// Returns a `Client` on success or a `SynxServerError` on failure.
-    ///
-    /// # Arguments
-    /// * `db_url` - A string slice that holds the database connection URL.
-    ///
-    /// # Returns
-    /// A `Result<Client, SynxServerError>`:
-    /// - `Ok(Client)`: Database client on successful connection.
-    /// - `Err(SynxServerError)`: An error of type `DatabaseConnectionError` if the connection fails,
-    ///   or `DbOptionsConfigurationError` if there's an error configuring the database options.
-    ///
-    /// # Errors
-    /// This function will return an error if:
-    /// - The database URL is invalid or the server is unreachable (returns `DatabaseConnectionError`).
-    /// - There's an error setting up the client options (returns `DbOptionsConfigurationError`).
-    async fn connect_db(db_url: &str) -> Result<Client> {
-        let client_options = ClientOptions::parse(db_url)
-            .await
-            .map_err(|err| SynxServerError::DatabaseConnectionError(err.to_string()))?;
-
-        let client = Client::with_options(client_options)
-            .map_err(|err| SynxServerError::DbOptionsConfigurationError(err.to_string()))?;
-
-        Ok(client)
     }
 
     async fn fetch_client_object_from_db(&self, id: &str) -> Result<Option<ClientObject>> {
@@ -99,17 +51,8 @@ impl StoreV1 {
         Ok(document)
     }
 
-    fn get_redis_connection(&self) -> Result<R2D2Con> {
-        self.redis_pool
-            .get_timeout(Duration::from_secs(CACHE_POOL_TIMEOUT_SECONDS))
-            .map_err(|e| {
-                eprintln!("error connecting to redis: {}", e);
-                SynxServerError::RedisPoolError(e.to_string())
-            })
-    }
-
     fn fetch_from_cache(&self, key: &str) -> Result<Option<String>> {
-        let mut conn = self.get_redis_connection()?;
+        let mut conn = self.get_redis_connection(CACHE_POOL_TIMEOUT_SECONDS)?;
 
         let value = conn
             .get(key)
@@ -126,7 +69,7 @@ impl StoreV1 {
     }
 
     fn save_to_cache(&self, key: &str, value: &str) -> Result<()> {
-        let mut conn = self.get_redis_connection()?;
+        let mut conn = self.get_redis_connection(CACHE_POOL_TIMEOUT_SECONDS)?;
         conn.set(key, value)
             .map_err(|err| SynxServerError::RedisCMDError(err.to_string()))?;
 
@@ -169,6 +112,17 @@ impl Store for StoreV1 {
 
         Ok(true)
     }
+
+    fn enqueue_job(&self, value: &str) -> Result<()> {
+        let mut conn = self.get_redis_connection(CACHE_POOL_TIMEOUT_SECONDS)?;
+
+        let value = conn
+            .rpush::<&str, &str, String>(JOB_QUEUE, value)
+            .map_err(|err| SynxServerError::DequeueJobError(err.to_string()))?;
+
+        println!("New job queued: {:?}", value);
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -205,7 +159,10 @@ mod tests {
 
     async fn setup() -> StoreV1 {
         dotenv::from_filename(".env.test").ok();
-        let mut store_v1 = StoreV1::new(&DATABASE_URL, &REDIS_URL, &DB_NAME)
+        let db_client = connect_db(&DATABASE_URL).await.unwrap();
+        let redis_client = connect_redis(&REDIS_URL).unwrap();
+
+        let mut store_v1 = StoreV1::new(db_client, redis_client, &DB_NAME)
             .await
             .unwrap();
 
@@ -224,16 +181,10 @@ mod tests {
         };
 
         let (key, value) = ("key", serde_json::to_string(&client).unwrap());
-        store_v1.save_to_cache(key, &value);
+        let _ = store_v1.save_to_cache(key, &value);
         let value = store_v1.fetch_from_cache(key).unwrap();
         let value = serde_json::from_str::<ClientObject>(&value.unwrap()).unwrap();
 
         assert!(value == client);
     }
-
-    // #[tokio::test]
-    // async fn store_test() {
-    //   let store_v1 = setup().await;
-    //   let
-    // }
 }

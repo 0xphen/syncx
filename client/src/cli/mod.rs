@@ -1,7 +1,7 @@
 pub mod subcommands;
 
 use crate::core::{context::Context, service::client};
-use proto::syncx::syncx_client::SyncxClient;
+use common::syncx::syncx_client::SyncxClient;
 use subcommands::*;
 
 use clap::{Parser, Subcommand};
@@ -26,11 +26,8 @@ enum Subcommands {
         about = "Create an account on the Syncx server"
     )]
     CreateAccount(CreateAccountArgs),
-    // #[clap(
-    //     name = "capture",
-    //     about = "Capture network packets and save in a .pcap file"
-    // )]
-    // BasicCapture(BasicCaptureArgs),
+    #[clap(name = "upload", about = "Upload files to the Syncx server")]
+    UploadFiles(UploadFilesArgs),
     // #[clap(name = "stream", about = "Captures and live streams network packets")]
     // LiveStream(LiveStreamArgs),
 }
@@ -40,6 +37,9 @@ pub async fn run(syncx_client: &mut SyncxClient<tonic::transport::Channel>, cont
     match args.sub {
         Subcommands::CreateAccount(args) => {
             client::register_client(syncx_client, args.password, context).await;
+        }
+        Subcommands::UploadFiles(args) => {
+            client::upload_files(syncx_client, &args.directory, context).await
         }
     }
 }

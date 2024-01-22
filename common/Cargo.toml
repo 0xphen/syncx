@@ -1,5 +1,5 @@
 [package]
-name = "proto"
+name = "common"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,7 +8,12 @@ edition = "2021"
 [dependencies]
 prost = "0.12.3"
 tonic = "0.10.2"
+zip = "0.6.6"
+merkle-tree = {path = "../merkle-tree"}
+rayon = "1.8.1"
+thiserror = "1.0.56"
+tempfile = "3.9.0"
 
 [build-dependencies]
 tonic-build = "0.10.2"
-prost-build = "0.12.3"
+
