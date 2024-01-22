@@ -14,6 +14,9 @@ pub const DEFAULT_DIR: &str = "temp";
 pub const TEMP_DIR: &str = "temp";
 pub const DEFAULT_ZIP_FILE: &str = "uploads.zip";
 pub const JOB_QUEUE: &str = "syncx_queue";
+pub const CACHE_POOL_MAX_OPEN: u32 = 16;
+pub const CACHE_POOL_MIN_IDLE: u32 = 8;
+pub const CACHE_POOL_EXPIRE_SECONDS: u64 = 60;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct ClientObject {

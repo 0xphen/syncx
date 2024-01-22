@@ -10,10 +10,9 @@ use reqwest;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 pub struct Queue {
-    redis_pool: Arc<R2D2Pool>,
+    redis_pool: R2D2Pool,
 }
 
 impl RedisPool for Queue {
@@ -23,7 +22,7 @@ impl RedisPool for Queue {
 }
 
 impl Queue {
-    pub fn new(redis_pool: Arc<R2D2Pool>) -> Self {
+    pub fn new(redis_pool: R2D2Pool) -> Self {
         Queue { redis_pool }
     }
 

@@ -1,28 +1,22 @@
 use super::{
     definitions::{ClientObject, Store, CACHE_POOL_TIMEOUT_SECONDS, JOB_QUEUE},
     errors::SynxServerError,
+    utils::*
 };
 
 use async_trait::async_trait;
-use mongodb::{bson::doc, options::ClientOptions, Client};
+use mongodb::{bson::doc, Client};
 use r2d2_redis::{
-    r2d2,
     redis::{cmd, Commands, Value},
-    RedisConnectionManager,
 };
 use serde_json;
-use std::{sync::Arc, time::Duration};
 
 use super::definitions::{R2D2Pool, RedisPool, Result};
-
-const CACHE_POOL_MAX_OPEN: u32 = 16;
-const CACHE_POOL_MIN_IDLE: u32 = 8;
-const CACHE_POOL_EXPIRE_SECONDS: u64 = 60;
 
 pub struct StoreV1 {
     db_client: Client,
     db_name: String,
-    redis_pool: Arc<R2D2Pool>,
+    redis_pool: R2D2Pool,
 }
 
 impl RedisPool for StoreV1 {
@@ -33,7 +27,7 @@ impl RedisPool for StoreV1 {
 
 impl StoreV1 {
     /// Creates a new `StoreV1` instance connected to the specified database URL.
-    pub async fn new(db_client: Client, redis_pool: Arc<R2D2Pool>, db_name: &str) -> Result<Self> {
+    pub async fn new(db_client: Client, redis_pool: R2D2Pool, db_name: &str) -> Result<Self> {
         // let db_client = Self::connect_db(db_url).await?;
         // let redis_pool = Self::connect_redis(redis_url)?;
 
@@ -42,48 +36,6 @@ impl StoreV1 {
             redis_pool,
             db_client,
         })
-    }
-
-    pub fn connect_redis(url: &str) -> Result<R2D2Pool> {
-        let manager = RedisConnectionManager::new(url)
-            .map_err(|err| SynxServerError::RedisConnectionError(err.to_string()))?;
-
-        let pool_manager = r2d2::Pool::builder()
-            .max_size(CACHE_POOL_MAX_OPEN)
-            .max_lifetime(Some(Duration::from_secs(CACHE_POOL_EXPIRE_SECONDS)))
-            .min_idle(Some(CACHE_POOL_MIN_IDLE))
-            .build(manager)
-            .map_err(|err| SynxServerError::RedisConnectionError(err.to_string()))?;
-
-        Ok(pool_manager)
-    }
-
-    /// Asynchronously creates a database client connection.
-    /// Establishes a connection to the database specified by `db_url`.
-    /// Returns a `Client` on success or a `SynxServerError` on failure.
-    ///
-    /// # Arguments
-    /// * `db_url` - A string slice that holds the database connection URL.
-    ///
-    /// # Returns
-    /// A `Result<Client, SynxServerError>`:
-    /// - `Ok(Client)`: Database client on successful connection.
-    /// - `Err(SynxServerError)`: An error of type `DatabaseConnectionError` if the connection fails,
-    ///   or `DbOptionsConfigurationError` if there's an error configuring the database options.
-    ///
-    /// # Errors
-    /// This function will return an error if:
-    /// - The database URL is invalid or the server is unreachable (returns `DatabaseConnectionError`).
-    /// - There's an error setting up the client options (returns `DbOptionsConfigurationError`).
-    pub async fn connect_db(db_url: &str) -> Result<Client> {
-        let client_options = ClientOptions::parse(db_url)
-            .await
-            .map_err(|err| SynxServerError::DatabaseConnectionError(err.to_string()))?;
-
-        let client = Client::with_options(client_options)
-            .map_err(|err| SynxServerError::DbOptionsConfigurationError(err.to_string()))?;
-
-        Ok(client)
     }
 
     async fn fetch_client_object_from_db(&self, id: &str) -> Result<Option<ClientObject>> {
@@ -207,10 +159,10 @@ mod tests {
 
     async fn setup() -> StoreV1 {
         dotenv::from_filename(".env.test").ok();
-        let db_client = StoreV1::connect_db(&DATABASE_URL).await.unwrap();
-        let redis_client = StoreV1::connect_redis(&REDIS_URL).unwrap();
+        let db_client = connect_db(&DATABASE_URL).await.unwrap();
+        let redis_client = connect_redis(&REDIS_URL).unwrap();
 
-        let mut store_v1 = StoreV1::new(db_client, Arc::new(redis_client), &DB_NAME)
+        let mut store_v1 = StoreV1::new(db_client, redis_client, &DB_NAME)
             .await
             .unwrap();
 
@@ -229,7 +181,7 @@ mod tests {
         };
 
         let (key, value) = ("key", serde_json::to_string(&client).unwrap());
-        store_v1.save_to_cache(key, &value);
+        let _ = store_v1.save_to_cache(key, &value);
         let value = store_v1.fetch_from_cache(key).unwrap();
         let value = serde_json::from_str::<ClientObject>(&value.unwrap()).unwrap();
 
