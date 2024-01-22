@@ -111,7 +111,6 @@ impl Worker {
 
         let files_to_upload = list_files_in_dir(&output_path.to_path_buf())
             .map_err(|_| SynxServerError::ListFilesError)?;
-
         // Generate the merkle tree from the files to be uploaded
         let merkle_tree = generate_merkle_tree(&files_to_upload)
             .map_err(|_| SynxServerError::MerkleTreeGenerationError)?;

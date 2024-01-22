@@ -1,8 +1,11 @@
-use super::{errors::SynxError, utils::*};
+use super::{errors::MerkleTreeError, utils::*};
+
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
+use serde_json;
 use std::collections::HashMap;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct MerkleTree {
     pub nodes: Vec<Vec<String>>,
     indexes: HashMap<String, (usize, usize)>,
@@ -62,17 +65,17 @@ impl MerkleTree {
         leaves
     }
 
-    pub fn generate_merkle_proof(&self, leaf: &str) -> Result<Vec<String>, SynxError> {
+    pub fn generate_merkle_proof(&self, leaf: &str) -> Result<Vec<String>, MerkleTreeError> {
         if let Some((_level, leaf_index)) = self.indexes.get(leaf) {
             self.proof(*leaf_index)
         } else {
-            Err(SynxError::InvalidNode)
+            Err(MerkleTreeError::InvalidNode)
         }
     }
 
-    fn proof(&self, leaf_index: usize) -> Result<Vec<String>, SynxError> {
+    fn proof(&self, leaf_index: usize) -> Result<Vec<String>, MerkleTreeError> {
         if leaf_index >= self.nodes[0].len() {
-            return Err(SynxError::OutOfBounds); // Leaf index is out of bounds
+            return Err(MerkleTreeError::OutOfBounds); // Leaf index is out of bounds
         }
 
         let mut proof = Vec::new();
@@ -81,7 +84,7 @@ impl MerkleTree {
         // Iterate through each level of the Merkle tree
         for level in self.nodes.iter().rev().skip(1).rev() {
             if level.len() <= index {
-                return Err(SynxError::OutOfBounds);
+                return Err(MerkleTreeError::OutOfBounds);
             }
 
             // Find the sibling index (left or right)
@@ -120,6 +123,16 @@ impl MerkleTree {
 
         indexes.sort_by(|&b, &a| b.0.cmp(&a.0));
         (indexes[0].1, indexes[1].1)
+    }
+
+    pub fn serialize(&self) -> Result<String, MerkleTreeError> {
+        Ok(serde_json::to_string(&self).map_err(|_| MerkleTreeError::SerializeTreeError)?)
+    }
+
+    pub fn deserialize(&self, merkle_tree_str: &str) -> Result<Self, MerkleTreeError> {
+        let deserialized: MerkleTree = serde_json::from_str(&merkle_tree_str)
+            .map_err(|_| MerkleTreeError::DeserializeTreeError)?;
+        Ok(deserialized)
     }
 
     pub fn leaf_nodes(&self) -> &Vec<String> {
