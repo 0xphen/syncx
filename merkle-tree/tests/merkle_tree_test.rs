@@ -70,4 +70,13 @@ mod tests {
 
         assert!(valid_leaf);
     }
+
+    #[test]
+    fn test_serialize_and_deserialize_tree() {
+        let merkle_tree = MerkleTree::new(&BYTE_ARRAY_MATRIX);
+        let serialized_tree = merkle_tree.serialize().unwrap();
+
+        let deserialized_tree = merkle_tree.deserialize(&serialized_tree).unwrap();
+        assert!(deserialized_tree == merkle_tree);
+    }
 }

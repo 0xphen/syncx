@@ -42,8 +42,9 @@ pub enum SynxServerError {
     #[error("Failed to parse int")]
     ParseIntError,
 
-    // #[error("Failed to parse int")]
-    // InvalidValueError,
+    #[error("Failed to read response bytes")]
+    HttpReadBytesError,
+
     #[error("Failed to hash password")]
     PasswordHashError,
 
@@ -68,8 +69,20 @@ pub enum SynxServerError {
     #[error("Failed to write to file")]
     WriteAllError,
 
+    #[error("Failed to generate merkle tree")]
+    MerkleTreeGenerationError,
+
+    #[error("Failed to create directory")]
+    CreateDirectoryError,
+
     #[error("Failed to open file")]
     FileOpenError,
+
+    #[error("Failed to unzip file")]
+    UnzipError,
+
+    #[error("Failed to list files in dir")]
+    ListFilesError,
 
     #[error("File upload failed {0}")]
     UploadFileRequestError(String),

@@ -18,7 +18,8 @@ use super::errors::SynxServerError;
 use super::{
     auth,
     config::Config,
-    definitions::{ClientObject, Result, Store, DEFAULT_DIR, DEFAULT_ZIP_FILE, TEMP_DIR},
+    definitions::{ClientObject, Result, Store, DEFAULT_ZIP_FILE, TEMP_DIR},
+    utils::{gcs_file_path, upload_file},
 };
 
 // #[derive(Debug, Clone)]
@@ -38,37 +39,6 @@ impl<T> Server<T> {
             config,
             http_client: reqwest::Client::new(),
         }
-    }
-
-    async fn upload_file(&self, file_path: &Path, uid: &str) -> Result<()> {
-        let file_contents = fs::read(file_path).map_err(|_| SynxServerError::ReadFileError)?;
-        let object_name = Self::gcs_file_path(&uid);
-
-        let url = format!(
-            "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name={}",
-            self.config.gcs_bucket_name, object_name
-        );
-
-        let api_key = std::env::var("GOOGLE_STORAGE_API_KEY").unwrap();
-
-        let _response = self
-            .http_client
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
-            .body(reqwest::Body::from(std::fs::read(file_path).map_err(
-                |err| SynxServerError::UploadFileRequestError(err.to_string()),
-            )?))
-            .send()
-            .await
-            .map_err(|err| SynxServerError::UploadFileRequestError(err.to_string()))?;
-
-        println!("Fil uploaded successfully {:?}", _response);
-
-        Ok(())
-    }
-
-    pub fn gcs_file_path(id: &str) -> String {
-        format!("{}/{}.zip", TEMP_DIR, id)
     }
 }
 
@@ -112,7 +82,10 @@ where
         let mut uid = String::new();
         let mut first_chunk = true;
 
-        fs::create_dir_all(DEFAULT_DIR)?;
+        //fs::create_dir_all(DEFAULT_DIR)?;
+        // Create the outer directory if it doesn't exist
+        let parent_dir = Path::new(TEMP_DIR);
+        fs::create_dir_all(&parent_dir)?;
 
         let mut file: Option<File> = None;
         let mut zip_path: Option<PathBuf> = None;
@@ -124,15 +97,12 @@ where
                 match auth::jwt::verify_jwt(&chunk.jwt, &self.config.jwt_secret) {
                     Ok(claims) => {
                         uid = claims.sub;
-                        // Create the outer directory if it doesn't exist
-                        let outer_dir = Path::new(DEFAULT_DIR);
-                        fs::create_dir_all(&outer_dir)?;
 
                         // Create the inner directory within the outer directory
-                        let inner_dir = outer_dir.join(&uid);
-                        fs::create_dir(&inner_dir)?;
+                        // let inner_dir = outer_dir.join(&uid);
+                        // fs::create_dir(&inner_dir)?;
+                        let file_path = parent_dir.join(format!("{}.zip", uid));
 
-                        let file_path = inner_dir.join(DEFAULT_ZIP_FILE);
                         file = Some(
                             fs::OpenOptions::new()
                                 .append(true)
@@ -158,9 +128,18 @@ where
             message: "File uploaded successfully".into(),
         };
 
-        self.upload_file(&zip_path.unwrap(), &uid).await.unwrap();
+        let api_key = std::env::var("GOOGLE_STORAGE_API_KEY").unwrap();
+        upload_file(
+            &zip_path.unwrap(),
+            &uid,
+            &api_key,
+            &self.config.gcs_bucket_name,
+            &gcs_file_path(&uid),
+        )
+        .await
+        .unwrap();
 
-        let value = Self::gcs_file_path(&uid);
+        let value = gcs_file_path(&uid);
         let _ = self.store.enqueue_job(&value);
 
         Ok(Response::new(response))

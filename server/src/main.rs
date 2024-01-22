@@ -1,7 +1,7 @@
 mod core;
 
 use common::syncx::syncx_server::SyncxServer;
-use core::{config::Config, server::Server as InnerServer, store_v1::StoreV1,  utils::*};
+use core::{config::Config, server::Server as InnerServer, store_v1::StoreV1, utils::*};
 use tonic::transport::Server;
 
 #[tokio::main]

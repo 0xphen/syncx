@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum SynxError {
+pub enum MerkleTreeError {
     #[error("Failed to decode hex")]
     FailedToDecodeHex,
 
@@ -10,4 +10,10 @@ pub enum SynxError {
 
     #[error("Index out of bounds")]
     OutOfBounds,
+
+    #[error("Failed to serialize merkle tree")]
+    SerializeTreeError,
+
+    #[error("Failed to deserialize merkle tree")]
+    DeserializeTreeError,
 }
