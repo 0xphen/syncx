@@ -1,7 +1,7 @@
 use super::{
     definitions::{
         R2D2Pool, RedisPool, Result, CACHE_POOL_TIMEOUT_SECONDS, GCS_PARENT_DIR, JOB_QUEUE,
-        PENDING_UPLOADS_DIR, TEMP_DIR,
+        MERKLE_DIR, PENDING_UPLOADS_DIR, TEMP_DIR,
     },
     errors::SynxServerError,
     utils::{download_file, extract_file_name_from_path, gcs_file_path, upload_file},
@@ -47,14 +47,14 @@ impl Worker {
         loop {
             match self.dequeue_job() {
                 Ok(job) => {
-                    println!("New job: {:?}", job);
+                    debug!("Processing new job: <{}>", job);
                     tokio::spawn(async move {
                         Self::process_job(job).await;
                     });
                 }
                 Err(e) => {
                     // TODO: Implement re-try logic
-                    eprintln!("Error dequeuing job: {}", e);
+                    error!("Error dequeuing job: {}", e);
                 }
             }
         }
@@ -107,20 +107,54 @@ impl Worker {
 
         unzip_file(&zip_path, &output_path.as_path()).map_err(|_| SynxServerError::UnzipError)?;
 
-        let files_to_upload = list_files_in_dir(&output_path.to_path_buf())
+        let mut files_to_upload = list_files_in_dir(&output_path.to_path_buf())
             .map_err(|_| SynxServerError::ListFilesError)?;
-        // Generate the merkle tree from the files to be uploaded
-        let merkle_tree = generate_merkle_tree(&files_to_upload)
-            .map_err(|_| SynxServerError::MerkleTreeGenerationError)?;
+          
+        info!("Files to upload: {:?}", files_to_upload);
 
+        // Generate the merkle tree from the files to be uploaded
+        let merkle_tree = generate_merkle_tree(&files_to_upload).map_err(|e| {
+            error!("Error generating merkle tree: Error {}", e);
+            SynxServerError::MerkleTreeGenerationError
+        })?;
+
+        let merkle_tree_str = merkle_tree.serialize().map_err(|e| {
+            error!("Error serializing merkle tree: Error {}", e);
+            SynxServerError::SerializeTreeError
+        })?;
+
+        // Write the serialized merkle tree to a file `temp/merkle_trees/{id}.txt`
+        let parent_dir = Path::new(MERKLE_DIR);
+        fs::create_dir_all(&parent_dir).map_err(|err| {
+            error!("Error creating merkle tress temp directory: Error {}", err);
+            SynxServerError::CreateDirectoryError
+        });
+
+        let merkle_file_path = parent_dir.join(format!("{}.txt", id));
+
+        let mut file = fs::File::create(&merkle_file_path).map_err(|e| {
+            error!("Error creating merkle tree file: Error {}", e);
+            SynxServerError::CreateFileError
+        })?;
+
+        file.write_all(merkle_tree_str.as_bytes()).map_err(|e| {
+            error!("Error writing merkle string: Error {}", e);
+            SynxServerError::WriteAllError
+        })?;
+
+        // Add the merkle tree file to the files to be uploaded
+        files_to_upload.push(merkle_file_path);
+
+        let mut count = 0;
         for (i, path) in files_to_upload.iter().enumerate() {
             let file_name = path.as_path().file_name().unwrap().to_string_lossy();
             let object_name = format!("{}/{}/{}", GCS_PARENT_DIR, id, file_name);
 
             upload_file(&path.as_path(), &id, api_key, bucket_name, &object_name).await?;
+            count += 1;
         }
 
-        println!("File upload successfull...");
+        info!("{} files uploaded", count);
         Ok(())
     }
 }

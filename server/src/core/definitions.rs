@@ -16,6 +16,7 @@ pub const QUEUE_DIR: &str = "temp";
 pub const GCS_PARENT_DIR: &str = "files";
 pub const PENDING_UPLOADS_DIR: &str = "temp/pending_uploads";
 pub const DEFAULT_ZIP_FILE: &str = "uploads.zip";
+pub const MERKLE_DIR: &str = "temp/merkle_trees";
 pub const JOB_QUEUE: &str = "syncx_queue";
 pub const CACHE_POOL_MAX_OPEN: u32 = 16;
 pub const CACHE_POOL_MIN_IDLE: u32 = 8;

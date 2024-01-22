@@ -19,7 +19,7 @@ use super::errors::SynxServerError;
 use super::{
     auth,
     config::Config,
-    definitions::{ClientObject, Result, Store, DEFAULT_ZIP_FILE, TEMP_DIR},
+    definitions::{ClientObject, Result, Store, TEMP_DIR},
     utils::{gcs_file_path, upload_file},
 };
 
