@@ -5,7 +5,7 @@ use common::syncx::syncx_client::SyncxClient;
 use subcommands::*;
 
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Parser)]
 #[clap(name = "syncx client", author = "0xphen", version)]
@@ -28,8 +28,9 @@ enum Subcommands {
     CreateAccount(CreateAccountArgs),
     #[clap(name = "upload", about = "Upload files to the Syncx server")]
     UploadFiles(UploadFilesArgs),
-    // #[clap(name = "stream", about = "Captures and live streams network packets")]
-    // LiveStream(LiveStreamArgs),
+
+    #[clap(name = "download", about = "Download a file from the Sync server")]
+    DownloadFile(DownloadFileArgs),
 }
 
 pub async fn run(syncx_client: &mut SyncxClient<tonic::transport::Channel>, context: &mut Context) {
@@ -40,6 +41,10 @@ pub async fn run(syncx_client: &mut SyncxClient<tonic::transport::Channel>, cont
         }
         Subcommands::UploadFiles(args) => {
             client::upload_files(syncx_client, &args.directory, context).await
+        }
+        Subcommands::DownloadFile(args) => {
+            let path = Path::new(&args.directory).to_path_buf();
+            client::download_file(syncx_client, &args.filename, &path, context).await
         }
     }
 }

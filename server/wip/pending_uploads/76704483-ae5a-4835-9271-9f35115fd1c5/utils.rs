@@ -1,12 +1,12 @@
-use env_logger::{Builder, Env};
-use merkle_tree::merkle_tree::MerkleTree;
+use merkle_tree::{merkle_tree::MerkleTree, utils::hash_bytes};
+use rayon::prelude::*;
 use rayon::prelude::*;
 use std::fs::{read_dir, File};
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use zip::{write::FileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
-use super::errors::CommonError;
+use super::errors::SynxClientError;
 
 /// Creates a ZIP archive from a collection of file paths, efficiently handling large files by streaming.
 ///
@@ -143,6 +143,12 @@ pub fn list_files_in_dir(dir_path: &PathBuf) -> io::Result<Vec<PathBuf>> {
     Ok(files)
 }
 
+// pub fn files_to_bytes<P: AsRef<Path>>(files: &Vec<P>) -> Result<Vec<Vec<u8>>, SynxClientError> {
+//   let files_as_bytes = files.par_iter().map(|file| {
+
+//   })
+// }
+
 /// Reads a file and accumulates its contents into a `Vec<u8>`.
 ///
 /// This function reads the file in chunks to efficiently handle large files while
@@ -193,23 +199,23 @@ pub fn file_to_bytes<P: AsRef<Path>>(path: P) -> io::Result<Vec<u8>> {
 ///
 /// # Returns
 ///
-/// Returns a `Result<MerkleTree, CommonError>`. On success, it contains the
+/// Returns a `Result<MerkleTree, SynxClientError>`. On success, it contains the
 /// Merkle tree constructed from the files' contents. On failure, it returns a
-/// `CommonError` indicating the type of error encountered, such as an issue
+/// `SynxClientError` indicating the type of error encountered, such as an issue
 /// reading the files.
 ///
 /// # Errors
 ///
 /// Returns an error if any file cannot be read or converted to bytes.
-pub fn generate_merkle_tree<P: AsRef<Path>>(paths: &Vec<P>) -> Result<MerkleTree, CommonError>
+pub fn generate_merkle_tree<P: AsRef<Path>>(paths: &Vec<P>) -> Result<MerkleTree, SynxClientError>
 where
     P: AsRef<Path> + Send + Sync,
 {
-    let leaf_bytes_results: Vec<Result<Vec<u8>, CommonError>> = paths
+    let leaf_bytes_results: Vec<Result<Vec<u8>, SynxClientError>> = paths
         .par_iter()
         .map(|path| {
             file_to_bytes(path.as_ref())
-                .map_err(|err| CommonError::FileToBytesConversionError(err.to_string()))
+                .map_err(|err| SynxClientError::FileToBytesConversionError(err.to_string()))
         })
         .collect();
 
@@ -303,7 +309,7 @@ mod tests {
 
         // Zip the file
         let zip_path = temp_dir.path().join("test.zip");
-        zip_files(&[&file_path], &&zip_path)?;
+        zip_files(&[&file_path], &zip_path)?;
 
         // Create another temporary directory for extraction
         let extract_dir = tempdir().unwrap();
@@ -321,8 +327,4 @@ mod tests {
         assert_eq!(original_contents, extracted_contents);
         Ok(())
     }
-}
-
-pub fn logger_init(default: Option<&str>) {
-    Builder::from_env(Env::default().default_filter_or(default.unwrap_or("warn"))).init();
 }

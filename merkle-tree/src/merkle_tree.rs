@@ -135,6 +135,16 @@ impl MerkleTree {
         Ok(deserialized)
     }
 
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, MerkleTreeError> {
+        let merkle_tree_str =
+            String::from_utf8(bytes.to_vec()).map_err(|_| MerkleTreeError::DeserializeTreeError)?;
+
+        let deserialized: MerkleTree = serde_json::from_str(&merkle_tree_str)
+            .map_err(|_| MerkleTreeError::DeserializeTreeError)?;
+
+        Ok(deserialized)
+    }
+
     pub fn leaf_nodes(&self) -> &Vec<String> {
         &self.nodes[0]
     }

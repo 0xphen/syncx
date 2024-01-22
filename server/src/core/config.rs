@@ -10,6 +10,7 @@ pub struct Config {
     pub jwt_exp: i64,
     pub db_name: String,
     pub gcs_bucket_name: String,
+    pub api_key: String,
 }
 
 impl Config {
@@ -44,14 +45,16 @@ impl Config {
             SynxServerError::InvalidServerSettings("GCS_BUCKET_NAME not present".to_string())
         })?;
 
-        std::env::var("GOOGLE_APPLICATION_CREDENTIALS_JSON").map_err(|_err| {
-            SynxServerError::InvalidServerSettings(
-                "GOOGLE_APPLICATION_CREDENTIALS_JSON not present".to_string(),
-            )
+        let api_key = std::env::var("GOOGLE_STORAGE_API_KEY").map_err(|_err| {
+            SynxServerError::InvalidServerSettings("GOOGLE_STORAGE_API_KEY not present".to_string())
         })?;
 
-        std::env::var("GOOGLE_STORAGE_API_KEY").map_err(|_err| {
-            SynxServerError::InvalidServerSettings("GOOGLE_STORAGE_API_KEY not present".to_string())
+        std::env::var("SERVER_ADDR").map_err(|_err| {
+            SynxServerError::InvalidServerSettings("SERVER_ADDR not present".to_string())
+        })?;
+
+        std::env::var("LOG_CONFIG").map_err(|_err| {
+            SynxServerError::InvalidServerSettings("LOG_CONFIG not present".to_string())
         })?;
 
         Ok(Config {
@@ -61,6 +64,7 @@ impl Config {
             jwt_exp,
             gcs_bucket_name,
             db_name,
+            api_key,
         })
     }
 }

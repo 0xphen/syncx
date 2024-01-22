@@ -4,7 +4,8 @@ package syncx;
 
 service Syncx {
   rpc RegisterClient(CreateClientRequest) returns (CreateClientResponse) {}
-  rpc UploadFiles(stream FileUploadRequest) returns (FileUploadResponse);
+  rpc UploadFiles(stream FileUploadRequest) returns (FileUploadResponse) {}
+  rpc DownloadFile(FileDownloadRequest) returns (stream FileDownloadResponse) {}
 }
 
 message CreateClientRequest {
@@ -23,4 +24,14 @@ message FileUploadRequest {
 
 message FileUploadResponse {
   string message = 1;
+}
+
+message FileDownloadRequest {
+  string jwt = 1;
+  string file_name = 2;
+}
+
+message FileDownloadResponse {
+  bytes content = 1;
+  repeated string merkle_proof = 2;
 }

@@ -1,15 +1,16 @@
 use super::{
-    definitions::{ClientObject, Store, CACHE_POOL_TIMEOUT_SECONDS, JOB_QUEUE},
+    definitions::{
+        ClientObject, R2D2Pool, RedisPool, Result, Store, CACHE_POOL_TIMEOUT_SECONDS, JOB_QUEUE,
+    },
     errors::SynxServerError,
     utils::*,
 };
 
 use async_trait::async_trait;
+use log::error;
 use mongodb::{bson::doc, Client};
 use r2d2_redis::redis::{cmd, Commands, Value};
 use serde_json;
-
-use super::definitions::{R2D2Pool, RedisPool, Result};
 
 pub struct StoreV1 {
     db_client: Client,
@@ -26,9 +27,6 @@ impl RedisPool for StoreV1 {
 impl StoreV1 {
     /// Creates a new `StoreV1` instance connected to the specified database URL.
     pub async fn new(db_client: Client, redis_pool: R2D2Pool, db_name: &str) -> Result<Self> {
-        // let db_client = Self::connect_db(db_url).await?;
-        // let redis_pool = Self::connect_redis(redis_url)?;
-
         Ok(Self {
             db_name: db_name.to_string(),
             redis_pool,
@@ -49,24 +47,7 @@ impl StoreV1 {
         Ok(document)
     }
 
-    fn fetch_from_cache(&self, key: &str) -> Result<Option<String>> {
-        let mut conn = self.get_redis_connection(CACHE_POOL_TIMEOUT_SECONDS)?;
-
-        let value = conn
-            .get(key)
-            .map_err(|err| SynxServerError::RedisCMDError(err.to_string()))?;
-
-        match value {
-            Value::Data(bytes) => {
-                let value = String::from_utf8(bytes)
-                    .map_err(|err| SynxServerError::DeserializationError(err.to_string()))?;
-                Ok(Some(value))
-            }
-            _ => Ok(None),
-        }
-    }
-
-    fn save_to_cache(&self, key: &str, value: &str) -> Result<()> {
+    pub fn save_to_cache(&self, key: &str, value: &str) -> Result<()> {
         let mut conn = self.get_redis_connection(CACHE_POOL_TIMEOUT_SECONDS)?;
         conn.set(key, value)
             .map_err(|err| SynxServerError::RedisCMDError(err.to_string()))?;
@@ -77,11 +58,24 @@ impl StoreV1 {
 
 #[async_trait]
 impl Store for StoreV1 {
+    fn fetch_from_cache(&self, key: &str) -> Result<Option<String>> {
+        let mut conn = self.get_redis_connection(CACHE_POOL_TIMEOUT_SECONDS)?;
+
+        let value = conn.get::<&str, Option<String>>(key).map_err(|err| {
+            error!("error retrieving key {}", key);
+            SynxServerError::RedisCMDError(err.to_string())
+        })?;
+
+        Ok(value)
+    }
+
     async fn get_client_object(&self, id: &str) -> Result<Option<ClientObject>> {
-        match self.fetch_from_cache(id)? {
+        let value = self.fetch_from_cache(id)?;
+        match value {
             Some(value) => {
                 let client_object: ClientObject = serde_json::from_str(&value)
                     .map_err(|err| SynxServerError::DeserializationError(err.to_string()))?;
+
                 Ok(Some(client_object))
             }
             None => {

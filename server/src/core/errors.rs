@@ -75,6 +75,9 @@ pub enum SynxServerError {
     #[error("Failed to create directory")]
     CreateDirectoryError,
 
+    #[error("Failed to create file")]
+    CreateFileError,
+
     #[error("Failed to open file")]
     FileOpenError,
 
@@ -86,4 +89,10 @@ pub enum SynxServerError {
 
     #[error("File upload failed {0}")]
     UploadFileRequestError(String),
+
+    #[error("Failed to serialize merkle tree")]
+    SerializeTreeError,
+
+    #[error("Failed to deserialize merkle tree")]
+    DeserializeTreeError,
 }
