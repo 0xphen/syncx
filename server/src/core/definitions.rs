@@ -10,8 +10,8 @@ pub type R2D2Pool = r2d2::Pool<RedisConnectionManager>;
 pub type R2D2Con = r2d2::PooledConnection<RedisConnectionManager>;
 
 pub const CACHE_POOL_TIMEOUT_SECONDS: u64 = 1;
-pub const DEFAULT_DIR: &str = "temp";
 pub const TEMP_DIR: &str = "temp";
+pub const QUEUE_DIR: &str = "temp";
 pub const DEFAULT_ZIP_FILE: &str = "uploads.zip";
 pub const JOB_QUEUE: &str = "syncx_queue";
 pub const CACHE_POOL_MAX_OPEN: u32 = 16;

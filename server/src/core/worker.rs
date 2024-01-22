@@ -1,9 +1,7 @@
 use super::{
-    definitions::{
-        R2D2Pool, RedisPool, Result, CACHE_POOL_TIMEOUT_SECONDS, DEFAULT_DIR, JOB_QUEUE,
-    },
+    definitions::{R2D2Pool, RedisPool, Result, CACHE_POOL_TIMEOUT_SECONDS, JOB_QUEUE, TEMP_DIR},
     errors::SynxServerError,
-    utils::extract_file_name_from_path,
+    utils::{extract_file_name_from_path, gcs_file_path},
 };
 use futures_util::stream::StreamExt;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
@@ -48,7 +46,6 @@ impl Worker {
                     tokio::spawn(async move {
                         Self::process_job(job).await;
                     });
-                    println!("After new job");
                 }
                 Err(e) => {
                     // TODO: Implement re-try logic
@@ -91,7 +88,7 @@ impl Worker {
             .await
             .map_err(|_| SynxServerError::HttpReadBytesError)?;
 
-        let parent_dir = Path::new(DEFAULT_DIR);
+        let parent_dir = Path::new(TEMP_DIR);
         let _ = fs::create_dir_all(parent_dir);
 
         let sub_parent_dir = parent_dir.join("queued");
@@ -100,7 +97,7 @@ impl Worker {
         let file_path =
             sub_parent_dir.join(extract_file_name_from_path(Path::new(object_name)).unwrap());
 
-        let mut file = fs::File::create(&file_path).unwrap();
+            let mut file = fs::File::create(&file_path).unwrap();
         file.write_all(&body)
             .map_err(|_| SynxServerError::FileOpenError)?;
 

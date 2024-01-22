@@ -1,10 +1,13 @@
 use super::{
-    definitions::{CACHE_POOL_EXPIRE_SECONDS, CACHE_POOL_MAX_OPEN, CACHE_POOL_MIN_IDLE},
+    definitions::{
+        CACHE_POOL_EXPIRE_SECONDS, CACHE_POOL_MAX_OPEN, CACHE_POOL_MIN_IDLE, QUEUE_DIR, TEMP_DIR,
+    },
     errors::SynxServerError,
 };
 
 use mongodb::{options::ClientOptions, Client};
 use r2d2_redis::{r2d2, RedisConnectionManager};
+use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
@@ -58,4 +61,24 @@ pub fn extract_file_name_from_path(path: &Path) -> Option<String> {
     } else {
         None
     }
+}
+
+pub fn delete_file_or_dir(path: &Path) -> std::io::Result<()> {
+    if path.is_dir() {
+        // Remove a directory and all its contents
+        fs::remove_dir_all(path)
+    } else if path.is_file() {
+        // Remove a file
+        fs::remove_file(path)
+    } else {
+        // Path does not exist or is neither a file nor a directory
+        Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Path is not a file or directory",
+        ))
+    }
+}
+
+pub fn gcs_file_path(id: &str) -> String {
+    format!("{}/{}.zip", TEMP_DIR, id)
 }
