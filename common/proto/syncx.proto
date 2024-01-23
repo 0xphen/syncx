@@ -33,5 +33,14 @@ message FileDownloadRequest {
 
 message FileDownloadResponse {
   bytes content = 1;
-  repeated string merkle_proof = 2;
+  MerkleProof merkle_proof = 2;
+}
+
+message MerkleProof {
+    repeated MerkleProofNode nodes = 1;
+}
+
+message MerkleProofNode {
+    string hash = 1; 
+    int32 flag = 2;
 }

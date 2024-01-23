@@ -4,7 +4,7 @@ use common::{
     common::{file_to_bytes, generate_merkle_tree},
     syncx::{
         syncx_server::Syncx, CreateClientRequest, CreateClientResponse, FileDownloadRequest,
-        FileDownloadResponse, FileUploadRequest, FileUploadResponse,
+        FileDownloadResponse, FileUploadRequest, FileUploadResponse, MerkleProof, MerkleProofNode,
     },
 };
 use merkle_tree::{merkle_tree::MerkleTree, utils::hash_bytes};
@@ -21,11 +21,11 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
-use super::errors::SynxServerError;
 use super::{
     auth,
     config::Config,
     definitions::{ClientObject, Result, Store, TEMP_DIR, WIP_DOWNLOADS_DIR},
+    errors::SynxServerError,
     utils::*,
 };
 
@@ -181,15 +181,17 @@ where
         let FileDownloadRequest { jwt, file_name } = request.into_inner();
         match auth::jwt::verify_jwt(&jwt, &self.config.jwt_secret) {
             Ok(claims) => {
-                let value = self.store.fetch_from_cache(&claims.sub).map_err(|err| {
-                    error!("Error getting value of key {} from redis", &file_name);
-                    Status::internal("Internal server error")
-                })?;
-
-                println!("VALUE IN CACHE: {:?} == {:?}", claims.sub, file_name);
+                let value = self
+                    .store
+                    .fetch_from_cache(&hash_str(&format!("{}{}", &claims.sub, &file_name)))
+                    .map_err(|err| {
+                        error!("Error getting value of key {} from redis", &file_name);
+                        Status::internal("Internal server error")
+                    })?;
 
                 // If file does not exists in cache, it means user has not uploaded such file.
                 if value.is_none() {
+                    println!("Not found in cache: {:?}", value);
                     return Err(Status::internal(format!("File {} not found", file_name)));
                 }
 
@@ -206,9 +208,7 @@ where
 
                 let files_and_download_path = vec![(file_1, path_1), (file_2, path_2)];
 
-                let download_paths: Vec<PathBuf> = vec![];
-                for (name, path) in files_and_download_path {
-                    println!("SEE: {:?} {:?}", &gsc_object_name(&claims.sub, &name), name);
+                for (name, path) in &files_and_download_path {
                     let f = download_file(
                         &name,
                         &self.config.gcs_bucket_name,
@@ -222,10 +222,12 @@ where
                     })?;
                 }
 
-                let content = file_to_bytes(&download_paths[0])
-                    .map_err(|_| Status::internal("Internal server error"))?;
+                let content = file_to_bytes(&files_and_download_path[0].1).map_err(|e| {
+                    error!("Error converting file to bytes. Error {}", e);
+                    Status::internal("Internal server error")
+                })?;
 
-                let merkle_tree_bytes = file_to_bytes(&download_paths[1])
+                let merkle_tree_bytes = file_to_bytes(&files_and_download_path[1].1)
                     .map_err(|_| Status::internal("Internal server error"))?;
 
                 let merkle_tree = MerkleTree::from_bytes(&merkle_tree_bytes)
@@ -236,8 +238,19 @@ where
                     .map_err(|_| {
                         Status::internal("Internal server error. Error generating merkle proof")
                     })?;
+               
+                let merkle_proof_nodes = merkle_proof
+                    .into_iter()
+                    .map(|(hash, flag)| MerkleProofNode {
+                        hash,
+                        flag: flag.into(),
+                    })
+                    .collect::<Vec<MerkleProofNode>>();
 
-                // let merkle_tree = generate_merkle_tree
+                let merkle_proof = Some(MerkleProof {
+                    nodes: merkle_proof_nodes,
+                });
+
                 let (mut tx, rx) = mpsc::channel(4);
                 // Here, spawn a new task to handle file reading and streaming
                 tokio::spawn(async move {
@@ -246,9 +259,10 @@ where
                         merkle_proof,
                     };
 
-                    tx.send(Ok(chunk))
-                        .await
-                        .map_err(|_| Status::internal("Internal server error"));
+                    tx.send(Ok(chunk)).await.map_err(|err| {
+                        error!("Error streaming chunk to client: Error {}", err);
+                        Status::internal("Internal server error")
+                    });
                 });
 
                 Ok(Response::new(Self::DownloadFileStream::new(rx)))

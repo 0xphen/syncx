@@ -171,7 +171,8 @@ impl Worker {
 
             // We cache the file name to redis for fast lookup. Excluding the "merkletree.txt" file
             if file_name != "merkletree.txt" {
-                self.cache_file_name(id);
+                let key = hash_str(&format!("{}{}", id, file_name));
+                self.cache_file_name(&key);
             }
         }
         info!("{} files uploaded", count);

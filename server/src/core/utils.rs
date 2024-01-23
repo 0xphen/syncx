@@ -1,21 +1,21 @@
 use super::{
     definitions::{
-        CACHE_POOL_EXPIRE_SECONDS, CACHE_POOL_MAX_OPEN, CACHE_POOL_MIN_IDLE, GCS_PARENT_DIR,
-        TEMP_DIR,
+        R2D2Pool, Result, CACHE_POOL_EXPIRE_SECONDS, CACHE_POOL_MAX_OPEN, CACHE_POOL_MIN_IDLE,
+        GCS_PARENT_DIR, TEMP_DIR,
     },
     errors::SynxServerError,
 };
 
+use hex;
 use log::{debug, error, info};
 use mongodb::{options::ClientOptions, Client};
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use r2d2_redis::{r2d2, RedisConnectionManager};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-
-use super::definitions::{R2D2Pool, Result};
 
 /// Asynchronously creates a database client connection.
 /// Establishes a connection to the database specified by `db_url`.
@@ -105,8 +105,6 @@ pub async fn download_file(
         SynxServerError::HttpReadBytesError
     })?;
 
-    println!("***SEE output_path***: {:?}", output_path);
-
     let mut file = fs::File::create(&output_path).unwrap();
     file.write_all(&body).map_err(|e| {
         error!("Error creating file from downloaded bytes: Error {}", e);
@@ -191,4 +189,10 @@ pub fn gsc_object_name(id: &str, file_name: &str) -> String {
 pub fn parse_path_from_slice(tokens: &Vec<&str>) -> PathBuf {
     let path_str = tokens.iter().map(|s| s.to_string()).collect::<String>();
     Path::new(&path_str).to_path_buf()
+}
+
+pub fn hash_str(value: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(value);
+    hex::encode(hasher.finalize())
 }
