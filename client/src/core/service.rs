@@ -4,10 +4,10 @@ pub mod client {
     use crate::core::{context::Context, utils::*};
     use common::syncx::{
         syncx_client::SyncxClient, CreateClientRequest, CreateClientResponse, FileDownloadRequest,
-        FileUploadRequest,
+        FileUploadRequest, MerkleProof, MerkleProofNode,
     };
     use log::info;
-    use merkle_tree::utils::hash_bytes;
+    use merkle_tree::{merkle_tree::MerkleTree, utils::hash_bytes};
     use std::fs;
     use std::io::Write;
     use std::path::{Path, PathBuf};
@@ -87,10 +87,14 @@ pub mod client {
     pub async fn download_file(
         syncx_client: &mut SyncxClient<tonic::transport::Channel>,
         file_name: &str,
-        output_path: &PathBuf,
+        download_dir: &PathBuf,
         context: &mut Context,
     ) {
-        println!("Downloading to: {:?}", output_path);
+        let download_dir = Path::new(download_dir);
+        fs::create_dir_all(download_dir);
+
+        let output_path = download_dir.join(file_name);
+
         let request = tonic::Request::new(FileDownloadRequest {
             jwt: context.app_config.jwt.to_string(),
             file_name: file_name.to_string(),
@@ -108,16 +112,39 @@ pub mod client {
             .open(&output_path)
             .unwrap();
 
-        let mut merkle_proof: Option<Vec<String>> = None;
+        let mut merkle_proof: Option<MerkleProof> = None;
         while let Some(response) = stream.message().await.unwrap() {
             if merkle_proof.is_none() {
-                merkle_proof = Some(response.merkle_proof);
+                merkle_proof = response.merkle_proof;
             }
 
             let chunk = response.content;
             file.write_all(&chunk).unwrap();
         }
 
-        println!("Download complete...");
+        println!(
+            "Download complete. File is valid <{:?}>",
+            verify_download(
+                &output_path,
+                &context.app_config.merkle_tree_root,
+                &merkle_proof.unwrap().nodes
+            )
+        );
+    }
+
+    fn verify_download(
+        file_path: &Path,
+        root_leaf: &str,
+        merkle_proof: &Vec<MerkleProofNode>,
+    ) -> bool {
+        let merkle_proof = merkle_proof
+            .iter()
+            .map(|node| (node.hash.clone(), node.flag as u8))
+            .collect::<Vec<(String, u8)>>();
+
+        let file_as_bytes = file_to_bytes(file_path).unwrap();
+        let file_hash = hash_bytes(&file_as_bytes);
+
+        MerkleTree::verify(&file_hash, merkle_proof, root_leaf)
     }
 }

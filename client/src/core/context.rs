@@ -23,7 +23,7 @@ pub struct AppConfig {
     id: String,
     password: String,
     pub jwt: String,
-    merkle_tree_root: String,
+    pub merkle_tree_root: String,
 }
 
 impl Default for AppConfig {

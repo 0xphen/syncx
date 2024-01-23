@@ -65,7 +65,7 @@ impl MerkleTree {
         leaves
     }
 
-    pub fn generate_merkle_proof(&self, leaf: &str) -> Result<Vec<String>, MerkleTreeError> {
+    pub fn generate_merkle_proof(&self, leaf: &str) -> Result<Vec<(String, u8)>, MerkleTreeError> {
         if let Some((_level, leaf_index)) = self.indexes.get(leaf) {
             self.proof(*leaf_index)
         } else {
@@ -73,7 +73,7 @@ impl MerkleTree {
         }
     }
 
-    fn proof(&self, leaf_index: usize) -> Result<Vec<String>, MerkleTreeError> {
+    fn proof(&self, leaf_index: usize) -> Result<Vec<(String, u8)>, MerkleTreeError> {
         if leaf_index >= self.nodes[0].len() {
             return Err(MerkleTreeError::OutOfBounds); // Leaf index is out of bounds
         }
@@ -94,9 +94,8 @@ impl MerkleTree {
                 index - 1
             };
 
-            // Add the sibling's hash to the proof
-            proof.push(level[sibling_index].clone());
-
+            let is_left_sibling = (index % 2 == 0) as u8; // 1 for right sibling, 0 for left
+            proof.push((level[sibling_index].clone(), is_left_sibling));
             // Move up to the parent level
             index /= 2;
         }
@@ -104,25 +103,18 @@ impl MerkleTree {
         Ok(proof)
     }
 
-    pub fn verify(&self, leaf: &str, merkle_proof: Vec<String>, root_leaf: &str) -> bool {
+    pub fn verify(leaf: &str, merkle_proof: Vec<(String, u8)>, root_leaf: &str) -> bool {
         let mut current_leaf = leaf.to_string();
 
-        for hash in merkle_proof {
-            let (a, b) = self.cmp_leaves(&current_leaf, hash.as_str());
-            current_leaf = hash_bytes(format!("{}{}", a, b).as_bytes());
+        for (sibling_hash, is_left_sibling) in merkle_proof {
+            if is_left_sibling == 0 {
+                current_leaf = hash_bytes(format!("{}{}", sibling_hash, current_leaf).as_bytes());
+            } else {
+                current_leaf = hash_bytes(format!("{}{}", current_leaf, sibling_hash).as_bytes());
+            }
         }
 
         current_leaf == root_leaf
-    }
-
-    fn cmp_leaves<'a>(&self, a: &'a str, b: &'a str) -> (&'a str, &'a str) {
-        let mut indexes = vec![
-            ((self.indexes.get(a).unwrap()).1, a),
-            ((self.indexes.get(b).unwrap()).1, b),
-        ];
-
-        indexes.sort_by(|&b, &a| b.0.cmp(&a.0));
-        (indexes[0].1, indexes[1].1)
     }
 
     pub fn serialize(&self) -> Result<String, MerkleTreeError> {
