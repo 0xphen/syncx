@@ -24,6 +24,7 @@ $ cargo build
 ```
 
 ## Usage
+Before running the server or worker, set up your [.env](https://github.com/0xphen/syncx/blob/main/server/env.template) file in the root of the server crate.
 #### Run the server and worker
 ```
 $ cargo run --bin server
