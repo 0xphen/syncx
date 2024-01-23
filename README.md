@@ -16,7 +16,7 @@ Syncx facilitates client-server interactions for file uploads and downloads, uti
 To set up this project, you need the protoc Protocol Buffers compiler, along with Protocol Buffers resource files.. For installing and setting up the Protocol Buffer compiler, refer to the [tonic](https://crates.io/crates/tonic) documentation. 
 
 ### Build
-Ensure Rust and Clone the repository and install dependencies:
+Ensure Rust is installed on your machine. The and Clone the repository and install dependencies:
 ```
 $ git clone git@github.com:0xphen/syncx.git
 $ cd syncx
