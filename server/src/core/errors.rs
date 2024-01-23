@@ -83,4 +83,7 @@ pub enum SynxServerError {
 
     #[error("Failed to deserialize merkle tree")]
     DeserializeTreeError,
+
+    #[error("Failed to convert file to bytes")]
+    ConvertFileToBytesError,
 }

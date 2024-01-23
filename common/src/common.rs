@@ -219,16 +219,16 @@ where
 }
 
 pub fn delete_files_in_directory(dir: &Path) -> std::io::Result<()> {
-  if dir.is_dir() {
-      for entry in fs::read_dir(dir)? {
-          let entry = entry?;
-          let path = entry.path();
-          if path.is_file() {
-              fs::remove_file(path)?;
-          }
-      }
-  }
-  Ok(())
+    if dir.is_dir() {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                fs::remove_file(path)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

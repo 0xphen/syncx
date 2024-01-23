@@ -206,7 +206,7 @@ pub fn ensure_directory_exists(path: &PathBuf) -> Result<()> {
 }
 
 pub fn get_file_name_from_path(path: &Path) -> Option<String> {
-  path.file_name()
-      .and_then(|file_name| file_name.to_str())
-      .map(|file_name_str| file_name_str.to_owned())
+    path.file_name()
+        .and_then(|file_name| file_name.to_str())
+        .map(|file_name_str| file_name_str.to_owned())
 }

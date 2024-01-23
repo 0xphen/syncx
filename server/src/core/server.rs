@@ -22,7 +22,8 @@ use uuid::Uuid;
 use super::{
     auth,
     config::Config,
-    definitions::{ClientObject, Store, TEMP_DIR, WIP_DOWNLOADS_DIR},
+    definitions::{ClientObject, Result, Store, TEMP_DIR, WIP_DOWNLOADS_DIR},
+    errors::SynxServerError,
     path_resolver::*,
     utils::*,
 };
@@ -33,12 +34,71 @@ pub struct Server<T> {
     config: Config,
 }
 
-impl<T> Server<T> {
+impl<T: Store> Server<T> {
     pub async fn new(store: T, config: Config) -> Self
     where
         T: Store + Send + Sync + 'static,
     {
         Self { store, config }
+    }
+
+    fn file_exists(&self, file_name: &str, id: &str) -> Result<Option<String>> {
+        Ok(self
+            .store
+            .fetch_from_cache(&hash_str(&format!("{}{}", id, &file_name)))
+            .map_err(|e| SynxServerError::RedisCMDError(e.to_string()))?)
+    }
+
+    async fn download_file(&self, id: &str, file_name: &str) -> Result<Vec<(String, PathBuf)>> {
+        let wip_dir = wip_downloads_dir(id);
+        let download_path = Path::new(&wip_dir);
+
+        let _ = ensure_directory_exists(&download_path.to_path_buf())?;
+
+        let obj_name_1 = gcs_backup_object_name(id, file_name);
+        let path_1 = download_path.join(&file_name);
+
+        let merkle_file_name = local_merkle_tree_file(id);
+        let obj_name_2 = gcs_backup_object_name(id, &merkle_file_name);
+        let path_2 = download_path.join("merkletree.txt");
+
+        let files_and_download_path = vec![(obj_name_1, path_1), (obj_name_2, path_2)];
+
+        for (name, path) in &files_and_download_path {
+            let _ = download_file(
+                &name,
+                &self.config.gcs_bucket_name,
+                &self.config.api_key,
+                path.as_path(),
+            )
+            .await?;
+        }
+
+        Ok(files_and_download_path)
+    }
+
+    fn generate_merkle_proof(
+        &self,
+        files_and_download_path: Vec<(String, PathBuf)>,
+        download_bytes: &Vec<u8>,
+    ) -> Result<Vec<MerkleProofNode>> {
+        let merkle_tree_bytes = file_to_bytes(&files_and_download_path[1].1)
+            .map_err(|_| SynxServerError::ConvertFileToBytesError)?;
+
+        let merkle_tree = MerkleTree::from_bytes(&merkle_tree_bytes)
+            .map_err(|_| SynxServerError::MerkleTreeGenerationError)?;
+
+        let merkle_proof = merkle_tree
+            .generate_merkle_proof(&hash_bytes(&download_bytes))
+            .map_err(|_| SynxServerError::MerkleTreeGenerationError)?;
+
+        Ok(merkle_proof
+            .into_iter()
+            .map(|(hash, flag)| MerkleProofNode {
+                hash,
+                flag: flag.into(),
+            })
+            .collect::<Vec<MerkleProofNode>>())
     }
 }
 
@@ -172,76 +232,38 @@ where
         request: tonic::Request<FileDownloadRequest>,
     ) -> std::result::Result<Response<Self::DownloadFileStream>, Status> {
         let FileDownloadRequest { jwt, file_name } = request.into_inner();
+
         match auth::jwt::verify_jwt(&jwt, &self.config.jwt_secret) {
             Ok(claims) => {
-                let value = self
-                    .store
-                    .fetch_from_cache(&hash_str(&format!("{}{}", &claims.sub, &file_name)))
-                    .map_err(|_err| {
-                        error!("Error getting value of key {} from redis", &file_name);
-                        Status::internal("Internal server error")
-                    })?;
+                let exists = self
+                    .file_exists(&file_name, &claims.sub)
+                    .map_err(|_| Status::internal("Internal server error"))?;
 
                 // If file does not exists in cache, it means user has not uploaded such file.
-                if value.is_none() {
+                if exists.is_none() {
                     return Err(Status::internal(format!("File {} not found", file_name)));
                 }
 
-                let wip_dir = wip_downloads_dir(&claims.sub);
-                let download_path = Path::new(&wip_dir);
-
-                ensure_directory_exists(&download_path.to_path_buf()).map_err(|err| {
-                    error!("Error creating local wip dir");
-                    Status::internal("Internal server error")
-                })?;
-
-                let obj_name_1 = gcs_backup_object_name(&claims.sub, &file_name);
-                let path_1 = download_path.join(&file_name);
-
-                let merkle_file_name = local_merkle_tree_file(&claims.sub);
-                let obj_name_2 = gcs_backup_object_name(&claims.sub, &merkle_file_name);
-                let path_2 = download_path.join("merkletree.txt");
-
-                let files_and_download_path = vec![(obj_name_1, path_1), (obj_name_2, path_2)];
-
-                for (name, path) in &files_and_download_path {
-                    let _f = download_file(
-                        &name,
-                        &self.config.gcs_bucket_name,
-                        &self.config.api_key,
-                        path.as_path(),
-                    )
+                let files_and_download_path = self
+                    .download_file(&claims.sub, &file_name)
                     .await
-                    .map_err(|err| {
-                        error!("Error downloading file {}. Err: {}", file_name, err);
+                    .map_err(|_| {
+                        error!(
+                            "Error downloading file {} for client {}",
+                            file_name, &claims.sub
+                        );
                         Status::internal("Internal server error")
                     })?;
-                }
 
-                let content = file_to_bytes(&files_and_download_path[0].1).map_err(|e| {
-                    error!("Error converting file to bytes. Error {}", e);
-                    Status::internal("Internal server error")
-                })?;
-
-                let merkle_tree_bytes = file_to_bytes(&files_and_download_path[1].1)
+                let content = file_to_bytes(&files_and_download_path[0].1)
                     .map_err(|_| Status::internal("Internal server error"))?;
 
-                let merkle_tree = MerkleTree::from_bytes(&merkle_tree_bytes)
-                    .map_err(|_| Status::internal("Internal server error"))?;
-
-                let merkle_proof = merkle_tree
-                    .generate_merkle_proof(&hash_bytes(&content))
+                let merkle_proof_nodes = self
+                    .generate_merkle_proof(files_and_download_path, &content)
                     .map_err(|_| {
-                        Status::internal("Internal server error. Error generating merkle proof")
+                        error!("Error generating merkle proof for bytes {:?}", content);
+                        Status::internal("Internal server error")
                     })?;
-
-                let merkle_proof_nodes = merkle_proof
-                    .into_iter()
-                    .map(|(hash, flag)| MerkleProofNode {
-                        hash,
-                        flag: flag.into(),
-                    })
-                    .collect::<Vec<MerkleProofNode>>();
 
                 let merkle_proof = Some(MerkleProof {
                     nodes: merkle_proof_nodes,
