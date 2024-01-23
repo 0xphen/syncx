@@ -1,11 +1,8 @@
 use common::common::logger_init;
 use core::panic;
-use futures_util::stream::StreamExt;
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
-use server::core::{config::Config, errors::SynxServerError, utils::*, worker::Worker};
-use std::fs;
-use std::io::Write;
-use std::path::{Path, PathBuf};
+
+use server::core::{config::Config, utils::*, worker::Worker};
+
 use std::sync::Arc;
 use tokio;
 

@@ -1,15 +1,13 @@
 extern crate common;
 
 use common::{
-    common::{file_to_bytes, generate_merkle_tree},
+    common::file_to_bytes,
     syncx::{
         syncx_server::Syncx, CreateClientRequest, CreateClientResponse, FileDownloadRequest,
         FileDownloadResponse, FileUploadRequest, FileUploadResponse, MerkleProof, MerkleProofNode,
     },
 };
 use merkle_tree::{merkle_tree::MerkleTree, utils::hash_bytes};
-use rayon::prelude::*;
-use reqwest;
 
 use log::{debug, error, info};
 use std::fs;
@@ -24,16 +22,15 @@ use uuid::Uuid;
 use super::{
     auth,
     config::Config,
-    definitions::{ClientObject, Result, Store, TEMP_DIR, WIP_DOWNLOADS_DIR},
-    errors::SynxServerError,
+    definitions::{ClientObject, Store, TEMP_DIR, WIP_DOWNLOADS_DIR},
+    path_resolver::*,
     utils::*,
 };
 
-// #[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Server<T> {
     store: T,
     config: Config,
-    http_client: reqwest::Client,
 }
 
 impl<T> Server<T> {
@@ -41,11 +38,7 @@ impl<T> Server<T> {
     where
         T: Store + Send + Sync + 'static,
     {
-        Self {
-            store,
-            config,
-            http_client: reqwest::Client::new(),
-        }
+        Self { store, config }
     }
 }
 
@@ -106,16 +99,17 @@ where
         let mut first_chunk = true;
         info!("New client #{}request to upload files", uid);
 
-        // Create the outer directory if it doesn't exist
-        let parent_dir = Path::new(TEMP_DIR);
-        fs::create_dir_all(&parent_dir)?;
+        let local_zip_dir = local_zip_dir();
+        let zip_dir = Path::new(&local_zip_dir);
+        let _ = ensure_directory_exists(&zip_dir.to_path_buf()).map_err(|_| {
+            error!("Error creating local zip dir");
+            Status::internal("Authorization failed")
+        });
 
         let mut file: Option<File> = None;
         let mut zip_path: Option<PathBuf> = None;
 
         let mut stream = request.into_inner();
-        // let mut all_chunks: Vec<u8> = Vec::new();
-
         info!("Streaming and recreating file {}.zip", uid);
 
         while let Some(chunk) = stream.message().await? {
@@ -125,7 +119,7 @@ where
                         uid = claims.sub;
 
                         // Create the inner directory within the outer directory
-                        let file_path = parent_dir.join(format!("{}.zip", uid));
+                        let file_path = zip_dir.join(format!("{}.zip", uid));
 
                         file = Some(
                             fs::OpenOptions::new()
@@ -133,9 +127,10 @@ where
                                 .create(true)
                                 .open(&file_path)?,
                         );
-                        zip_path = Some(file_path);
 
-                        debug!("Zip file created {}/{}.zip", TEMP_DIR, uid);
+                        debug!("Zip file created {:?}", file_path);
+
+                        zip_path = Some(file_path);
                     }
                     Err(_) => {
                         error!("Un-authorized access with JWT {}", &chunk.jwt);
@@ -147,7 +142,6 @@ where
 
             if let Some(ref mut f) = file {
                 f.write_all(&chunk.content)?;
-                // all_chunks.extend(&chunk.content);
             } else {
                 return Err(Status::internal("File not initialized"));
             }
@@ -162,14 +156,13 @@ where
             &uid,
             &self.config.api_key,
             &self.config.gcs_bucket_name,
-            &gcs_zip_path(&uid),
+            &gcs_zip_file_object_name(&uid),
         )
         .await
         .unwrap();
 
-        let value = gcs_zip_path(&uid);
-        let _ = self.store.enqueue_job(&value);
-        info!("New job <{}> queued", value);
+        let _ = self.store.enqueue_job(&uid);
+        info!("New job <{}> queued", uid);
 
         Ok(Response::new(response))
     }
@@ -184,32 +177,37 @@ where
                 let value = self
                     .store
                     .fetch_from_cache(&hash_str(&format!("{}{}", &claims.sub, &file_name)))
-                    .map_err(|err| {
+                    .map_err(|_err| {
                         error!("Error getting value of key {} from redis", &file_name);
                         Status::internal("Internal server error")
                     })?;
 
+                    println!("CACHE: {:?}", &hash_str(&format!("{}{}", &claims.sub, &file_name)));
+
                 // If file does not exists in cache, it means user has not uploaded such file.
                 if value.is_none() {
-                    println!("Not found in cache: {:?}", value);
                     return Err(Status::internal(format!("File {} not found", file_name)));
                 }
 
-                let download_path = parse_path_from_slice(&vec![WIP_DOWNLOADS_DIR, &claims.sub]);
+                let wip_dir = wip_downloads_dir(&claims.sub);
+                let download_path = Path::new(&wip_dir);
 
-                let download_path = Path::new(download_path.as_path());
-                fs::create_dir_all(&download_path)?;
+                ensure_directory_exists(&download_path.to_path_buf()).map_err(|err| {
+                    error!("Error creating local wip dir");
+                    Status::internal("Internal server error")
+                })?;
 
-                let file_1 = gsc_object_name(&claims.sub, &file_name);
+                let obj_name_1 = gcs_backup_object_name(&claims.sub, &file_name);
                 let path_1 = download_path.join(&file_name);
 
-                let file_2 = gsc_object_name(&claims.sub, "merkletree.txt");
+                let merkle_file_name = local_merkle_tree_file(&claims.sub);
+                let obj_name_2 = gcs_backup_object_name(&claims.sub, &merkle_file_name);
                 let path_2 = download_path.join("merkletree.txt");
 
-                let files_and_download_path = vec![(file_1, path_1), (file_2, path_2)];
+                let files_and_download_path = vec![(obj_name_1, path_1), (obj_name_2, path_2)];
 
                 for (name, path) in &files_and_download_path {
-                    let f = download_file(
+                    let _f = download_file(
                         &name,
                         &self.config.gcs_bucket_name,
                         &self.config.api_key,
@@ -238,7 +236,7 @@ where
                     .map_err(|_| {
                         Status::internal("Internal server error. Error generating merkle proof")
                     })?;
-               
+
                 let merkle_proof_nodes = merkle_proof
                     .into_iter()
                     .map(|(hash, flag)| MerkleProofNode {
@@ -251,7 +249,7 @@ where
                     nodes: merkle_proof_nodes,
                 });
 
-                let (mut tx, rx) = mpsc::channel(4);
+                let (tx, rx) = mpsc::channel(4);
                 // Here, spawn a new task to handle file reading and streaming
                 tokio::spawn(async move {
                     let chunk = FileDownloadResponse {
@@ -259,7 +257,7 @@ where
                         merkle_proof,
                     };
 
-                    tx.send(Ok(chunk)).await.map_err(|err| {
+                    let _ = tx.send(Ok(chunk)).await.map_err(|err| {
                         error!("Error streaming chunk to client: Error {}", err);
                         Status::internal("Internal server error")
                     });

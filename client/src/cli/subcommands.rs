@@ -1,4 +1,4 @@
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 use derive_builder::Builder;
 
 #[derive(Debug, Clone, Parser, Builder)]

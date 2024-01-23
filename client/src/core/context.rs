@@ -2,11 +2,11 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::fs::{File, OpenOptions};
-use std::io::prelude::*;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use super::errors::SynxClientError;
 
+#[derive(Debug)]
 pub struct Context {
     pub app_config: AppConfig,
     pub path: PathBuf,

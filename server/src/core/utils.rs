@@ -71,14 +71,14 @@ pub async fn download_file(
     object_name: &str,
     gcs_bucket_name: &str,
     api_key: &str,
-    output_path: &Path,
+    file_path: &Path,
 ) -> Result<()> {
     info!("Attempting to download file {:?} from storage", object_name);
 
     const FRAGMENT: &AsciiSet = &CONTROLS.add(b'/');
     let gcs_object_name = utf8_percent_encode(&object_name, FRAGMENT).to_string();
 
-    let mut url = format!(
+    let url = format!(
         "https://storage.googleapis.com/storage/v1/b/{}/o/{}?alt=media",
         gcs_bucket_name, gcs_object_name
     );
@@ -105,7 +105,7 @@ pub async fn download_file(
         SynxServerError::HttpReadBytesError
     })?;
 
-    let mut file = fs::File::create(&output_path).unwrap();
+    let mut file = fs::File::create(&file_path).unwrap();
     file.write_all(&body).map_err(|e| {
         error!("Error creating file from downloaded bytes: Error {}", e);
         SynxServerError::FileOpenError
@@ -116,7 +116,7 @@ pub async fn download_file(
 
 pub async fn upload_file(
     file_path: &Path,
-    uid: &str,
+    id: &str,
     api_key: &str,
     gcs_bucket_name: &str,
     object_name: &str,
@@ -195,4 +195,18 @@ pub fn hash_str(value: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(value);
     hex::encode(hasher.finalize())
+}
+
+pub fn ensure_directory_exists(path: &PathBuf) -> Result<()> {
+    if !path.exists() {
+        fs::create_dir_all(path).map_err(|_| SynxServerError::CreateDirectoryError)?;
+    }
+
+    Ok(())
+}
+
+pub fn get_file_name_from_path(path: &Path) -> Option<String> {
+  path.file_name()
+      .and_then(|file_name| file_name.to_str())
+      .map(|file_name_str| file_name_str.to_owned())
 }

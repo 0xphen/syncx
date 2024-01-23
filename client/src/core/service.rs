@@ -1,18 +1,18 @@
 pub mod client {
     extern crate common;
 
-    use crate::core::{context::Context, utils::*};
-    use common::syncx::{
-        syncx_client::SyncxClient, CreateClientRequest, CreateClientResponse, FileDownloadRequest,
-        FileUploadRequest, MerkleProof, MerkleProofNode,
+    use crate::core::context::Context;
+    use common::{
+        common::{file_to_bytes, generate_merkle_tree, list_files_in_dir, zip_files},
+        syncx::{
+            syncx_client::SyncxClient, CreateClientRequest, CreateClientResponse,
+            FileDownloadRequest, FileUploadRequest, MerkleProof, MerkleProofNode,
+        },
     };
-    use log::info;
     use merkle_tree::{merkle_tree::MerkleTree, utils::hash_bytes};
     use std::fs;
     use std::io::Write;
     use std::path::{Path, PathBuf};
-    use tokio::{fs::File, io::AsyncReadExt, sync::mpsc};
-    use tokio_stream::wrappers::ReceiverStream;
 
     const DEFAULT_ZIP_FILE: &str = "uploads.zip";
 
@@ -21,6 +21,7 @@ pub mod client {
         password: String,
         context: &mut Context,
     ) {
+        println!("Registering new client on syncx server...");
         let response = syncx_client
             .register_client(CreateClientRequest {
                 password: password.to_string(),
@@ -38,6 +39,8 @@ pub mod client {
                     .app_config
                     .write(&context.path)
                     .unwrap_or_else(|e| panic!("Failed to update app state: {}", e));
+
+                println!("{:?}", context.app_config);
             }
             Err(e) => {
                 panic!("Failed to create user account {:?}", e);
@@ -54,13 +57,13 @@ pub mod client {
         let merkle_tree = generate_merkle_tree(&files).unwrap();
 
         let zip_path = PathBuf::from(path).join(DEFAULT_ZIP_FILE);
-        zip_files(&files, &zip_path);
+        let _ = zip_files(&files, &zip_path);
 
         context
             .app_config
             .set_merkle_root(merkle_tree.root().to_string());
 
-        context.app_config.write(&context.path);
+        let _ = context.app_config.write(&context.path);
 
         let file_contents = tokio::fs::read(&zip_path).await.unwrap();
         let checksum = hash_bytes(&file_contents);
@@ -91,7 +94,7 @@ pub mod client {
         context: &mut Context,
     ) {
         let download_dir = Path::new(download_dir);
-        fs::create_dir_all(download_dir);
+        let _ = fs::create_dir_all(download_dir);
 
         let output_path = download_dir.join(file_name);
 
@@ -122,21 +125,28 @@ pub mod client {
             file.write_all(&chunk).unwrap();
         }
 
-        println!(
-            "Download complete. File is valid <{:?}>",
-            verify_download(
-                &output_path,
-                &context.app_config.merkle_tree_root,
-                &merkle_proof.unwrap().nodes
-            )
+        println!("File {:?} dowmloaded", output_path);
+        println!("Merkle proof: {:?}", &merkle_proof.clone().unwrap().nodes);
+        println!("Verifying file validity...",);
+
+        let (valid, root) = verify_download(
+            &output_path,
+            &context.app_config.merkle_tree_root,
+            &merkle_proof.unwrap().nodes,
         );
+
+        println!(
+            "File is valid <{}>. Computed merkle root: {:?}",
+            valid, root
+        );
+        println!("View your merkle root on your client to confirm [cargo run merkleroot]")
     }
 
     fn verify_download(
         file_path: &Path,
         root_leaf: &str,
         merkle_proof: &Vec<MerkleProofNode>,
-    ) -> bool {
+    ) -> (bool, String) {
         let merkle_proof = merkle_proof
             .iter()
             .map(|node| (node.hash.clone(), node.flag as u8))

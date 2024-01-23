@@ -1,8 +1,5 @@
 #[derive(thiserror::Error, Debug)]
 pub enum SynxServerError {
-    #[error("Invalid server settings: {0}")]
-    InvalidServerConfigError(String),
-
     #[error("Failed to register client: {0}")]
     InvalidServerSettings(String),
 
@@ -15,14 +12,8 @@ pub enum SynxServerError {
     #[error("Failed to connect to Redis: {0}")]
     RedisConnectionError(String),
 
-    #[error("Failed to obtain a Redis connection: {0}")]
-    FailedToObtainRedisConnection(String),
-
     #[error("Failed to get client #{0}")]
     ClientDataAccessError(String),
-
-    #[error("Failed to retrieve Redis data: {0}")]
-    RedisTypeError(String),
 
     #[error("Failed to execute Redis command: {0}")]
     RedisCMDError(String),
@@ -62,9 +53,6 @@ pub enum SynxServerError {
 
     #[error("Failed to queue job id #{0}")]
     DequeueJobError(String),
-
-    #[error("Failed to read file")]
-    ReadFileError,
 
     #[error("Failed to write to file")]
     WriteAllError,
