@@ -8,7 +8,7 @@ use super::{
 use async_trait::async_trait;
 use log::error;
 use mongodb::{bson::doc, Client};
-use r2d2_redis::redis::{Commands};
+use r2d2_redis::redis::Commands;
 use serde_json;
 
 pub struct StoreV1 {

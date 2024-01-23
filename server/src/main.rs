@@ -3,7 +3,7 @@ mod core;
 use common::{common::logger_init, syncx::syncx_server::SyncxServer};
 use core::{config::Config, server::Server as InnerServer, store_v1::StoreV1, utils::*};
 use log::{error, info};
-use std::env;
+
 use tonic::transport::Server;
 
 #[tokio::main]
