@@ -29,7 +29,7 @@ use super::{
     utils::*,
 };
 
-// #[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Server<T> {
     store: T,
     config: Config,
