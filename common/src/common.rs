@@ -1,7 +1,7 @@
 use env_logger::{Builder, Env};
 use merkle_tree::merkle_tree::MerkleTree;
 use rayon::prelude::*;
-use std::fs::{read_dir, File};
+use std::fs::{self, read_dir, File};
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use zip::{write::FileOptions, CompressionMethod, ZipArchive, ZipWriter};
@@ -216,6 +216,19 @@ where
     let leaf_bytes: Vec<Vec<u8>> = leaf_bytes_results.into_iter().collect::<Result<_, _>>()?;
 
     Ok(MerkleTree::new(&leaf_bytes))
+}
+
+pub fn delete_files_in_directory(dir: &Path) -> std::io::Result<()> {
+  if dir.is_dir() {
+      for entry in fs::read_dir(dir)? {
+          let entry = entry?;
+          let path = entry.path();
+          if path.is_file() {
+              fs::remove_file(path)?;
+          }
+      }
+  }
+  Ok(())
 }
 
 #[cfg(test)]

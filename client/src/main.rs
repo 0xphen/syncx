@@ -8,9 +8,6 @@ use core::context::*;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_config_path = AppConfig::get_config_path()
         .unwrap_or_else(|e| panic!("Failed to get client config path {}", e));
-
-    println!("Loading client config...");
-
     let app_config = match AppConfig::read(&app_config_path) {
         Ok(app_config) => app_config,
         Err(_) => {

@@ -3,7 +3,7 @@ pub mod client {
 
     use crate::core::context::Context;
     use common::{
-        common::{file_to_bytes, generate_merkle_tree, list_files_in_dir, zip_files},
+        common::*,
         syncx::{
             syncx_client::SyncxClient, CreateClientRequest, CreateClientResponse,
             FileDownloadRequest, FileUploadRequest, MerkleProof, MerkleProofNode,
@@ -53,10 +53,11 @@ pub mod client {
         path: &str,
         context: &mut Context,
     ) {
-        let files = list_files_in_dir(&PathBuf::from(path)).unwrap();
+        let path = PathBuf::from(path);
+        let files = list_files_in_dir(&path).unwrap();
         let merkle_tree = generate_merkle_tree(&files).unwrap();
 
-        let zip_path = PathBuf::from(path).join(DEFAULT_ZIP_FILE);
+        let zip_path = PathBuf::from(&path).join(DEFAULT_ZIP_FILE);
         let _ = zip_files(&files, &zip_path);
 
         context
@@ -82,7 +83,10 @@ pub mod client {
             .insert("checksum", checksum.parse().unwrap());
 
         match syncx_client.upload_files(request).await {
-            Ok(response) => println!("SUMMARY: {:?}", response.into_inner()),
+            Ok(response) => {
+                println!("{:?}", response.into_inner());
+                let _ = delete_files_in_directory(&path);
+            }
             Err(e) => println!("something went wrong: {:?}", e),
         }
     }
