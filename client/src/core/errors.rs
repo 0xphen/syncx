@@ -17,4 +17,10 @@ pub enum SynxClientError {
 
     #[error("Failed to convert file to bytes:  {0}")]
     FileToBytesConversionError(String),
+
+    #[error("Failed to serialize merkle tree")]
+    SerializeTreeError,
+
+    #[error("Failed to deserialize merkle tree")]
+    DeserializeTreeError,
 }
