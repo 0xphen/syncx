@@ -182,6 +182,8 @@ where
                         Status::internal("Internal server error")
                     })?;
 
+                    println!("CACHE: {:?}", &hash_str(&format!("{}{}", &claims.sub, &file_name)));
+
                 // If file does not exists in cache, it means user has not uploaded such file.
                 if value.is_none() {
                     return Err(Status::internal(format!("File {} not found", file_name)));

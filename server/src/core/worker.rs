@@ -230,6 +230,8 @@ impl Worker {
 
         let merkle_file_path = Self::write_merkle_tree_to_file(id, &files_to_upload)?;
 
+        let merkle_name = get_file_name_from_path(&merkle_file_path).unwrap();
+
         // Add the merkle tree file to the files to be uploaded
         files_to_upload.push(merkle_file_path);
 
@@ -242,7 +244,7 @@ impl Worker {
             count += 1;
 
             // We cache the file name to redis for fast lookup. Excluding the "merkletree.txt" file
-            if file_name != "merkletree.txt" {
+            if file_name != merkle_name {
                 let key = hash_str(&format!("{}{}", id, file_name));
                 let _ = self.cache_file_name(&key);
             }

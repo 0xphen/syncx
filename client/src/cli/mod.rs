@@ -5,7 +5,7 @@ use common::syncx::syncx_client::SyncxClient;
 use subcommands::*;
 
 use clap::{Parser, Subcommand};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Debug, Parser)]
 #[clap(name = "syncx client", author = "0xphen", version)]
@@ -31,6 +31,9 @@ enum Subcommands {
 
     #[clap(name = "download", about = "Download a file from the Sync server")]
     DownloadFile(DownloadFileArgs),
+
+    #[clap(name = "merkleroot", about = "View merkle root of uploaded files")]
+    MerkleRoot,
 }
 
 pub async fn run(syncx_client: &mut SyncxClient<tonic::transport::Channel>, context: &mut Context) {
@@ -45,6 +48,9 @@ pub async fn run(syncx_client: &mut SyncxClient<tonic::transport::Channel>, cont
         Subcommands::DownloadFile(args) => {
             let path = Path::new(&args.directory).to_path_buf();
             client::download_file(syncx_client, &args.filename, &path, context).await
+        }
+        Subcommands::MerkleRoot => {
+            println!("Merkle root: <{}>", context.app_config.merkle_tree_root)
         }
     }
 }

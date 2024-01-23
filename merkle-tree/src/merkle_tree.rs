@@ -103,7 +103,7 @@ impl MerkleTree {
         Ok(proof)
     }
 
-    pub fn verify(leaf: &str, merkle_proof: Vec<(String, u8)>, root_leaf: &str) -> bool {
+    pub fn verify(leaf: &str, merkle_proof: Vec<(String, u8)>, root_leaf: &str) -> (bool, String) {
         let mut current_leaf = leaf.to_string();
 
         for (sibling_hash, is_left_sibling) in merkle_proof {
@@ -114,7 +114,7 @@ impl MerkleTree {
             }
         }
 
-        current_leaf == root_leaf
+        (current_leaf == root_leaf, current_leaf)
     }
 
     pub fn serialize(&self) -> Result<String, MerkleTreeError> {

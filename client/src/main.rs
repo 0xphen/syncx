@@ -1,7 +1,7 @@
 mod cli;
 mod core;
 
-use common::syncx::{syncx_client::SyncxClient, CreateClientRequest};
+use common::syncx::syncx_client::SyncxClient;
 use core::context::*;
 
 #[tokio::main]
@@ -13,10 +13,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app_config = match AppConfig::read(&app_config_path) {
         Ok(app_config) => app_config,
-        Err(err) => {
+        Err(_) => {
             println!("Client config not found. Creating new config...");
+            println!("Config saved to {:?}", app_config_path);
+
             let app_config = AppConfig::default();
-            app_config.write(&app_config_path);
+            let _ = app_config.write(&app_config_path);
             app_config
         }
     };
