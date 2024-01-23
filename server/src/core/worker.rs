@@ -1,6 +1,6 @@
 use super::{
     definitions::{
-        R2D2Pool, RedisPool, Result, CACHE_POOL_TIMEOUT_SECONDS, GCS_PARENT_DIR, JOB_QUEUE,
+        R2D2Pool, RedisPool, Result, CACHE_POOL_TIMEOUT_SECONDS, JOB_QUEUE,
         MERKLE_DIR, TEMP_DIR, WIP_UPLOADS_DIR,
     },
     errors::SynxServerError,
@@ -9,13 +9,13 @@ use super::{
 use common::common::{generate_merkle_tree, list_files_in_dir, unzip_file};
 use futures_util::stream::StreamExt;
 use log::{debug, error, info};
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+
 use r2d2_redis::redis::Commands;
-use reqwest;
+
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::path::{Path};
+use std::sync::{Arc};
 
 pub struct Worker {
     redis_pool: Arc<R2D2Pool>,
@@ -45,7 +45,7 @@ impl Worker {
     fn cache_file_name(&self, key: &str) -> Result<()> {
         let mut conn = self.get_redis_connection(CACHE_POOL_TIMEOUT_SECONDS)?;
 
-        let x = conn.set::<&str, bool, String>(key, true).unwrap();
+        let _x = conn.set::<&str, bool, String>(key, true).unwrap();
 
         info!("Saved filename {} to redis.", key);
 
@@ -162,7 +162,7 @@ impl Worker {
         files_to_upload.push(merkle_file_path);
 
         let mut count = 0;
-        for (i, path) in files_to_upload.iter().enumerate() {
+        for (_i, path) in files_to_upload.iter().enumerate() {
             let file_name = path.as_path().file_name().unwrap().to_string_lossy();
             let object_name = gsc_object_name(&id, &file_name);
 

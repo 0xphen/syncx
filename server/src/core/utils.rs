@@ -78,7 +78,7 @@ pub async fn download_file(
     const FRAGMENT: &AsciiSet = &CONTROLS.add(b'/');
     let gcs_object_name = utf8_percent_encode(&object_name, FRAGMENT).to_string();
 
-    let mut url = format!(
+    let url = format!(
         "https://storage.googleapis.com/storage/v1/b/{}/o/{}?alt=media",
         gcs_bucket_name, gcs_object_name
     );
@@ -116,7 +116,7 @@ pub async fn download_file(
 
 pub async fn upload_file(
     file_path: &Path,
-    uid: &str,
+    _uid: &str,
     api_key: &str,
     gcs_bucket_name: &str,
     object_name: &str,

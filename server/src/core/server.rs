@@ -1,7 +1,7 @@
 extern crate common;
 
 use common::{
-    common::{file_to_bytes, generate_merkle_tree},
+    common::{file_to_bytes},
     syncx::{
         syncx_server::Syncx, CreateClientRequest, CreateClientResponse, FileDownloadRequest,
         FileDownloadResponse, FileUploadRequest, FileUploadResponse, MerkleProof, MerkleProofNode,
@@ -24,8 +24,7 @@ use uuid::Uuid;
 use super::{
     auth,
     config::Config,
-    definitions::{ClientObject, Result, Store, TEMP_DIR, WIP_DOWNLOADS_DIR},
-    errors::SynxServerError,
+    definitions::{ClientObject, Store, TEMP_DIR, WIP_DOWNLOADS_DIR},
     utils::*,
 };
 
@@ -184,7 +183,7 @@ where
                 let value = self
                     .store
                     .fetch_from_cache(&hash_str(&format!("{}{}", &claims.sub, &file_name)))
-                    .map_err(|err| {
+                    .map_err(|_err| {
                         error!("Error getting value of key {} from redis", &file_name);
                         Status::internal("Internal server error")
                     })?;
@@ -209,7 +208,7 @@ where
                 let files_and_download_path = vec![(file_1, path_1), (file_2, path_2)];
 
                 for (name, path) in &files_and_download_path {
-                    let f = download_file(
+                    let _f = download_file(
                         &name,
                         &self.config.gcs_bucket_name,
                         &self.config.api_key,
@@ -251,7 +250,7 @@ where
                     nodes: merkle_proof_nodes,
                 });
 
-                let (mut tx, rx) = mpsc::channel(4);
+                let (tx, rx) = mpsc::channel(4);
                 // Here, spawn a new task to handle file reading and streaming
                 tokio::spawn(async move {
                     let chunk = FileDownloadResponse {
