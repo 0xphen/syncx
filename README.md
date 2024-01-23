@@ -42,6 +42,7 @@ $ cargo run create_account -p "<password>"
 ```
 
 ##### Upload file(s) server
+This command uploads all files in the specified directory, and deletes them afterwards.
 ```
 $ cargo run upload -d <path to directory>
 ```
