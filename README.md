@@ -1,4 +1,4 @@
-# Syncx
+# Syncx 🚧
 Syncx facilitates client-server interactions for file uploads and downloads, utilizing Google Cloud Storage. The server stores files uploaded by clients, who can later retrieve these files along with a Merkle proof to verify integrity. The project comprises four crates, implementing a simple yet effective architecture with gRPC communication, a background worker system, and MongoDB and Redis for data management.
 
 ## Crates Overview
